@@ -17,4 +17,14 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - run: echo "Build workflow created"
+      - name: Show Files
+        run: ls -R
+
+      - name: Verify Project
+        run: |
+          test -f build.gradle.kts
+          test -f settings.gradle.kts
+          test -f src/main/resources/plugin.yml
+
+      - name: Success
+        run: echo "Project structure verified!"
