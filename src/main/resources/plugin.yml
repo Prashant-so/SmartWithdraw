@@ -1,0 +1,9 @@
+name: SmartWithdraw
+version: 1.0.0
+main: com.smartwithdraw.SmartWithdraw
+api-version: '1.21'
+
+commands:
+  withdraw:
+    description: Withdraw money into bank notes
+    usage: /withdraw <amount>
