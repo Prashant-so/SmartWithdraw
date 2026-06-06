@@ -1,11 +1,16 @@
 package com.smartwithdraw.command;
 
+import com.smartwithdraw.currency.DenominationCalculator;
+import com.smartwithdraw.currency.NoteFactory;
 import com.smartwithdraw.economy.EconomyManager;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+
+import java.util.Map;
 
 public class WithdrawCommand implements CommandExecutor {
 
@@ -22,12 +27,12 @@ public class WithdrawCommand implements CommandExecutor {
             return true;
         }
 
-        double amount;
+        int amount;
 
         try {
-            amount = Double.parseDouble(args[0]);
+            amount = Integer.parseInt(args[0]);
         } catch (NumberFormatException e) {
-            player.sendMessage(ChatColor.RED + "Please enter a valid number.");
+            player.sendMessage(ChatColor.RED + "Please enter a valid amount.");
             return true;
         }
 
@@ -46,7 +51,20 @@ public class WithdrawCommand implements CommandExecutor {
             return true;
         }
 
-        player.sendMessage(ChatColor.GREEN + "Successfully withdrew ₹" + amount + ".");
+        Map<Integer, Integer> notes = DenominationCalculator.calculate(amount);
+
+        for (Map.Entry<Integer, Integer> entry : notes.entrySet()) {
+
+            int value = entry.getKey();
+            int count = entry.getValue();
+
+            for (int i = 0; i < count; i++) {
+                ItemStack note = NoteFactory.createNote(value);
+                player.getInventory().addItem(note);
+            }
+        }
+
+        player.sendMessage(ChatColor.GREEN + "You withdrew ₹" + amount + " successfully.");
 
         return true;
     }
