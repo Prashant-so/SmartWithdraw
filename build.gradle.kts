@@ -9,8 +9,10 @@ repositories {
     mavenCentral()
 
     maven("https://repo.papermc.io/repository/maven-public/")
+
     maven("https://jitpack.io")
-    maven("https://repo.codemc.io/repository/maven-releases/")
+
+    maven("https://repo.codemc.org/repository/maven-releases/")
 }
 
 dependencies {
@@ -22,12 +24,4 @@ java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(21))
     }
-}
-
-tasks.withType<JavaCompile> {
-    options.encoding = "UTF-8"
-}
-
-tasks.jar {
-    archiveFileName.set("SmartWithdraw-${project.version}.jar")
 }
