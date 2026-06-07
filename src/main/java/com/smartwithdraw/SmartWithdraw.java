@@ -7,8 +7,12 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public final class SmartWithdraw extends JavaPlugin {
 
+    private static SmartWithdraw instance;
+
     @Override
     public void onEnable() {
+
+        instance = this;
 
         if (!EconomyManager.setupEconomy()) {
             getLogger().severe("Vault not found!");
@@ -25,10 +29,16 @@ public final class SmartWithdraw extends JavaPlugin {
                 this
         );
 
+        saveDefaultConfig();
+
         getLogger().info("SmartWithdraw enabled.");
     }
 
     @Override
     public void onDisable() {
+    }
+
+    public static SmartWithdraw getInstance() {
+        return instance;
     }
 }
