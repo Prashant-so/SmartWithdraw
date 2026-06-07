@@ -7,4 +7,5 @@ public final class NoteKeys {
 
     public static final String VALUE = "value";
     public static final String NOTE_ID = "note_id";
+    public static final String NOTE_TYPE = "bank_note";
 }
