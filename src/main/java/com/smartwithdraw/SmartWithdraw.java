@@ -1,39 +1,28 @@
 package com.smartwithdraw;
 
 import com.smartwithdraw.command.WithdrawCommand;
-import com.smartwithdraw.economy.EconomyManager;
+import com.smartwithdraw.listener.NoteRedeemListener;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class SmartWithdraw extends JavaPlugin {
 
-    private static SmartWithdraw instance;
-
     @Override
     public void onEnable() {
 
-        instance = this;
-
-        saveDefaultConfig();
-
-        if (!EconomyManager.setup(this)) {
-            getLogger().severe("Failed to hook into Vault!");
-            getServer().getPluginManager().disablePlugin(this);
-            return;
-        }
+        getLogger().info("SmartWithdraw enabled!");
 
         if (getCommand("withdraw") != null) {
             getCommand("withdraw").setExecutor(new WithdrawCommand());
         }
 
-        getLogger().info("SmartWithdraw enabled successfully!");
+        getServer().getPluginManager().registerEvents(
+                new NoteRedeemListener(),
+                this
+        );
     }
 
     @Override
     public void onDisable() {
         getLogger().info("SmartWithdraw disabled!");
-    }
-
-    public static SmartWithdraw getInstance() {
-        return instance;
     }
 }
