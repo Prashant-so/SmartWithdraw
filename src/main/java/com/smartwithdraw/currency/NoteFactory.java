@@ -10,6 +10,8 @@ public final class NoteFactory {
 
     public static ItemStack createNote(int value) {
 
-        return new ItemStack(Material.PAPER);
+        ItemStack item = new ItemStack(Material.PAPER);
+
+        return item;
     }
 }
