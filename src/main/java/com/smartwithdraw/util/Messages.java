@@ -2,7 +2,7 @@ package com.smartwithdraw.util;
 
 public final class Messages {
 
-```
+
 private Messages() {
 }
 
@@ -20,6 +20,6 @@ public static final String WITHDRAW_SUCCESS =
 
 public static final String DEPOSIT_SUCCESS =
         PREFIX + "§aDeposit successful.";
-```
+
 
 }
