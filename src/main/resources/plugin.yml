@@ -10,3 +10,7 @@ commands:
   withdraw:
     description: Withdraw money into notes
     usage: /withdraw <amount>
+
+permissions:
+  smartwithdraw.withdraw:
+    default: true
