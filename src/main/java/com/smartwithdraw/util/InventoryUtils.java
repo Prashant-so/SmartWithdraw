@@ -7,7 +7,7 @@ import java.util.Map;
 
 public final class InventoryUtils {
 
-
+```
 private InventoryUtils() {
 }
 
@@ -26,6 +26,6 @@ public static void give(Player player, ItemStack item) {
         );
     }
 }
-
+```
 
 }
