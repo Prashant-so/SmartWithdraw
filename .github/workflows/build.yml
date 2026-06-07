@@ -15,8 +15,8 @@ steps:
 
   - uses: actions/setup-java@v4
     with:
-      distribution: 'temurin'
-      java-version: '21'
+      distribution: temurin
+      java-version: 21
 
   - name: Show Files
     run: ls -R
