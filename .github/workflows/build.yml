@@ -26,4 +26,4 @@ jobs:
           test -f settings.gradle.kts
           test -f src/main/resources/plugin.yml
       - name: Success
-        run: echo "Project structure verified!
+        run: echo "Project structure verified!"
