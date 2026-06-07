@@ -1,13 +1,10 @@
 package com.smartwithdraw.security;
 
-import com.smartwithdraw.SmartWithdraw;
-import org.bukkit.NamespacedKey;
+public final class NoteKeys {
 
-public class NoteKeys {
+    private NoteKeys() {
+    }
 
-    public static final NamespacedKey VALUE =
-            new NamespacedKey(SmartWithdraw.getInstance(), "value");
-
-    public static final NamespacedKey SIGNATURE =
-            new NamespacedKey(SmartWithdraw.getInstance(), "signature");
+    public static final String VALUE = "value";
+    public static final String NOTE_ID = "note_id";
 }
