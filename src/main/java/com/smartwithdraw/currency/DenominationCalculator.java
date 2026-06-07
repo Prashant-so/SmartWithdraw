@@ -3,7 +3,7 @@ package com.smartwithdraw.currency;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-public class DenominationCalculator {
+public final class DenominationCalculator {
 
     private static final int[] DENOMINATIONS = {
             2000,
@@ -14,17 +14,22 @@ public class DenominationCalculator {
             1
     };
 
+    private DenominationCalculator() {
+    }
+
     public static Map<Integer, Integer> calculate(int amount) {
 
         Map<Integer, Integer> notes = new LinkedHashMap<>();
 
-        for (int value : DENOMINATIONS) {
+        int remaining = amount;
 
-            int count = amount / value;
+        for (int denomination : DENOMINATIONS) {
+
+            int count = remaining / denomination;
 
             if (count > 0) {
-                notes.put(value, count);
-                amount %= value;
+                notes.put(denomination, count);
+                remaining %= denomination;
             }
         }
 
