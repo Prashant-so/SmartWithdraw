@@ -13,7 +13,6 @@ import java.util.Map;
 
 public class WithdrawCommand implements CommandExecutor {
 
-```
 @Override
 public boolean onCommand(CommandSender sender,
                          Command command,
