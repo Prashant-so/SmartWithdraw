@@ -6,6 +6,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 public final class NoteFactory {
 
@@ -31,6 +32,8 @@ public final class NoteFactory {
         lore.add("");
         lore.add("§e▶ Right-Click to deposit");
         lore.add("§7into your account");
+        lore.add("");
+        lore.add("§8ID: §7" + UUID.randomUUID());
         lore.add("");
         lore.add("§bSmart Withdraw Bank");
         lore.add("");
