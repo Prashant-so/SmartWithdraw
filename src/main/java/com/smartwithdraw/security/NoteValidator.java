@@ -1,18 +1,28 @@
 package com.smartwithdraw.security;
 
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 
 public final class NoteValidator {
 
-    private NoteValidator() {
+```
+private NoteValidator() {
+}
+
+public static boolean isValid(ItemStack item) {
+
+    if (item == null) {
+        return false;
     }
 
-    public static boolean isValid(ItemStack item) {
-
-        if (item == null) {
-            return false;
-        }
-
-        return item.hasItemMeta();
+    if (!item.hasItemMeta()) {
+        return false;
     }
+
+    ItemMeta meta = item.getItemMeta();
+
+    return meta.hasDisplayName();
+}
+```
+
 }
