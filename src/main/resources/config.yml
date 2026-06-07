@@ -1,16 +1,17 @@
 resource-pack:
-  enabled: false
-  force: false
-  url: ""
-  sha1: ""
+enabled: false
+force: false
+url: ""
+sha1: ""
 
 notes:
-  right-click-deposit: true
+right-click-deposit: true
+deposit-method: RIGHT_CLICK
 
 messages:
-  prefix: "&6&lSmartWithdraw &8» "
+prefix: "&6&lSmartWithdraw &8» "
 
-  withdraw-success: "&aSuccessfully withdrew &f₹%amount%"
-  insufficient-funds: "&cYou do not have enough money."
-  invalid-amount: "&cPlease enter a valid amount."
-  deposit-success: "&aDeposited &f₹%amount%"
+withdraw-success: "&aSuccessfully withdrew &f₹%amount%"
+insufficient-funds: "&cYou do not have enough money."
+invalid-amount: "&cPlease enter a valid amount."
+deposit-success: "&aDeposited &f₹%amount%"
