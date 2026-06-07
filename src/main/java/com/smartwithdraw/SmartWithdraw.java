@@ -8,7 +8,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public final class SmartWithdraw extends JavaPlugin {
 
-```
+
 private static SmartWithdraw instance;
 
 @Override
@@ -48,6 +48,6 @@ public void onDisable() {
 public static SmartWithdraw getInstance() {
     return instance;
 }
-```
+
 
 }
