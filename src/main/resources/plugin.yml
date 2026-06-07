@@ -3,7 +3,10 @@ version: 1.0.0
 main: com.smartwithdraw.SmartWithdraw
 api-version: '1.21'
 
+depend:
+  - Vault
+
 commands:
   withdraw:
-    description: Withdraw money into bank notes
+    description: Withdraw money into notes
     usage: /withdraw <amount>
