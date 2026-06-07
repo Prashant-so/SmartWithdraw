@@ -1,6 +1,7 @@
 package com.smartwithdraw.command;
 
 import com.smartwithdraw.currency.DenominationCalculator;
+import com.smartwithdraw.currency.NoteFactory;
 import com.smartwithdraw.economy.EconomyManager;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -18,7 +19,6 @@ public class WithdrawCommand implements CommandExecutor {
                              String[] args) {
 
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("Players only.");
             return true;
         }
 
@@ -37,23 +37,30 @@ public class WithdrawCommand implements CommandExecutor {
             }
 
             if (!EconomyManager.has(player, amount)) {
-                player.sendMessage("§cNot enough money.");
+                player.sendMessage("§cYou do not have enough money.");
                 return true;
             }
+
+            EconomyManager.withdraw(player, amount);
 
             Map<Integer, Integer> notes =
                     DenominationCalculator.calculate(amount);
 
-            player.sendMessage("§6§lSmartWithdraw §8» §aBreakdown:");
-
             for (Map.Entry<Integer, Integer> entry : notes.entrySet()) {
 
-                player.sendMessage(
-                        "§e₹" + entry.getKey()
-                                + " §7x §f"
-                                + entry.getValue()
-                );
+                int value = entry.getKey();
+                int amountOfNotes = entry.getValue();
+
+                for (int i = 0; i < amountOfNotes; i++) {
+                    player.getInventory().addItem(
+                            NoteFactory.createNote(value)
+                    );
+                }
             }
+
+            player.sendMessage(
+                    "§6§lSmartWithdraw §8» §aWithdrawn ₹" + amount
+            );
 
         } catch (NumberFormatException ex) {
 
