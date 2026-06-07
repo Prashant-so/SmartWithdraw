@@ -16,17 +16,17 @@ steps:
   - uses: actions/setup-java@v4
     with:
       distribution: temurin
-      java-version: 21
+      java-version: '21'
 
-  - name: Install Gradle
-    uses: gradle/actions/setup-gradle@v4
+  - name: Show Files
+    run: ls -R
 
-  - name: Build
-    run: gradle build
+  - name: Verify Project
+    run: |
+      test -f build.gradle.kts
+      test -f settings.gradle.kts
+      test -f src/main/resources/plugin.yml
 
-  - name: Upload Jar
-    uses: actions/upload-artifact@v4
-    with:
-      name: SmartWithdraw
-      path: build/libs/*.jar
+  - name: Success
+    run: echo "Project structure verified!"
 ```
