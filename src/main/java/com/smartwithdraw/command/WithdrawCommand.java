@@ -74,6 +74,5 @@ public boolean onCommand(CommandSender sender,
 
     return true;
 }
-```
 
 }
