@@ -21,6 +21,10 @@ public static boolean isValid(ItemStack item) {
 
     ItemMeta meta = item.getItemMeta();
 
+    if (meta == null) {
+        return false;
+    }
+
     return meta.hasDisplayName();
 }
 ```
