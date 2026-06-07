@@ -8,6 +8,11 @@ public final class NoteValidator {
     }
 
     public static boolean isValid(ItemStack item) {
-        return item != null;
+
+        if (item == null) {
+            return false;
+        }
+
+        return item.hasItemMeta();
     }
 }
