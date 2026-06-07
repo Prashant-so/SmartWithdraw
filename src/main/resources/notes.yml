@@ -1,0 +1,18 @@
+notes:
+  1:
+    color: GREEN
+
+  10:
+    color: GOLD
+
+  50:
+    color: AQUA
+
+  100:
+    color: LIGHT_PURPLE
+
+  500:
+    color: YELLOW
+
+  2000:
+    color: DARK_PURPLE
