@@ -13,10 +13,10 @@ commands:
     usage: /withdraw <amount>
 
   smartwithdraw:
-description: SmartWithdraw Help
-usage: /smartwithdraw
-aliases:
-- sw
+    description: SmartWithdraw Help
+    usage: /smartwithdraw
+    aliases:
+      - sw
 
 permissions:
   smartwithdraw.withdraw:
