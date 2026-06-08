@@ -9,7 +9,6 @@ import org.bukkit.persistence.PersistentDataType;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 public final class NoteFactory {
 
@@ -49,9 +48,6 @@ public static ItemStack createNote(int value) {
     NamespacedKey noteKey =
             new NamespacedKey(SmartWithdraw.getInstance(), "smartwithdraw_note");
 
-    NamespacedKey idKey =
-            new NamespacedKey(SmartWithdraw.getInstance(), "note_id");
-
     meta.getPersistentDataContainer().set(
             valueKey,
             PersistentDataType.INTEGER,
@@ -62,12 +58,6 @@ public static ItemStack createNote(int value) {
             noteKey,
             PersistentDataType.BYTE,
             (byte) 1
-    );
-
-    meta.getPersistentDataContainer().set(
-            idKey,
-            PersistentDataType.STRING,
-            UUID.randomUUID().toString()
     );
 
     note.setItemMeta(meta);
