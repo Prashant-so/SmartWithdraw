@@ -30,6 +30,10 @@ public void onRedeem(PlayerInteractEvent event) {
 
     ItemStack item = event.getItem();
 
+    if (item == null) {
+        return;
+    }
+
     if (!NoteValidator.isValid(item)) {
         return;
     }
@@ -53,6 +57,22 @@ public void onRedeem(PlayerInteractEvent event) {
     }
 
     Player player = event.getPlayer();
+
+    if (player.isSneaking() && item.getAmount() > 1) {
+
+        int total = value * item.getAmount();
+
+        EconomyManager.deposit(player, total);
+
+        player.getInventory().setItemInMainHand(null);
+
+        player.sendMessage(
+                "§6§lSmartWithdraw §8» §aDeposited ₹" + total
+        );
+
+        event.setCancelled(true);
+        return;
+    }
 
     EconomyManager.deposit(player, value);
 
