@@ -6,10 +6,10 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 public final class NoteFactory {
 
+```
 private NoteFactory() {
 }
 
@@ -32,8 +32,6 @@ public static ItemStack createNote(int value) {
     lore.add("");
     lore.add("§e▶ Right-Click to deposit");
     lore.add("§7into your account");
-    lore.add("");
-    lore.add("§8Serial: §7" + UUID.randomUUID());
     lore.add("");
     lore.add("§bSmart Withdraw Bank");
     lore.add("");
@@ -58,5 +56,6 @@ private static String getName(int value) {
         default -> "§f✦ ₹" + value + " Note ✦";
     };
 }
+```
 
 }
