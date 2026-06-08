@@ -11,6 +11,11 @@ commands:
   withdraw:
     description: Withdraw money into notes
     usage: /withdraw <amount>
+  deposit:
+    description: Deposit all notes
+    usage: /deposit
+    aliases:
+      -sw
 
   smartwithdraw:
     description: SmartWithdraw Help
