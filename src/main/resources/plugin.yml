@@ -4,13 +4,18 @@ main: com.smartwithdraw.SmartWithdraw
 api-version: '1.21'
 
 depend:
-  - Vault
+
+* Vault
 
 commands:
-  withdraw:
-    description: Withdraw money into notes
-    usage: /withdraw <amount>
+withdraw:
+description: Withdraw money into notes
+usage: /withdraw <amount>
+
+smartwithdraw:
+description: SmartWithdraw Help
+aliases: [sw]
 
 permissions:
-  smartwithdraw.withdraw:
-    default: true
+smartwithdraw.withdraw:
+default: true
