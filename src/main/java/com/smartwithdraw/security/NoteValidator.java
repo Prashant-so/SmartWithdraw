@@ -8,7 +8,6 @@ import org.bukkit.persistence.PersistentDataType;
 
 public final class NoteValidator {
 
-```
 private NoteValidator() {
 }
 
@@ -38,6 +37,5 @@ public static boolean isValid(ItemStack item) {
             PersistentDataType.BYTE
     );
 }
-```
 
 }
