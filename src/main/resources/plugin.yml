@@ -10,14 +10,14 @@ depend:
 commands:
   withdraw:
     description: Withdraw money into notes
-usage: /withdraw <amount>
+    usage: /withdraw <amount>
 
-smartwithdraw:
+  smartwithdraw:
 description: SmartWithdraw Help
 usage: /smartwithdraw
 aliases:
 - sw
 
 permissions:
-smartwithdraw.withdraw:
-default: true
+  smartwithdraw.withdraw:
+    default: true
