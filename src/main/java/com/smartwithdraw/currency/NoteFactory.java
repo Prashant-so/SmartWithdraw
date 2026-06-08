@@ -13,6 +13,7 @@ import java.util.UUID;
 
 public final class NoteFactory {
 
+```
 private NoteFactory() {
 }
 
@@ -26,6 +27,7 @@ public static ItemStack createNote(int value) {
     }
 
     meta.setDisplayName(getName(value));
+    meta.setCustomModelData(getModelData(value));
 
     List<String> lore = new ArrayList<>();
 
@@ -74,6 +76,18 @@ public static ItemStack createNote(int value) {
     return note;
 }
 
+private static int getModelData(int value) {
+    return switch (value) {
+        case 1 -> 1001;
+        case 10 -> 1010;
+        case 50 -> 1050;
+        case 100 -> 1100;
+        case 500 -> 1500;
+        case 2000 -> 2000;
+        default -> 9999;
+    };
+}
+
 private static String getName(int value) {
 
     return switch (value) {
@@ -86,5 +100,6 @@ private static String getName(int value) {
         default -> "§f✦ ₹" + value + " Note ✦";
     };
 }
+```
 
 }
