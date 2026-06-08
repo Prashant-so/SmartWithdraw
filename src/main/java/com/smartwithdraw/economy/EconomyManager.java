@@ -11,7 +11,6 @@ import java.util.List;
 
 public class NoteRedeemListener implements Listener {
 
-```
 @EventHandler
 public void onRedeem(PlayerInteractEvent event) {
 
@@ -75,6 +74,5 @@ public void onRedeem(PlayerInteractEvent event) {
             "§6§lSmartWithdraw §8» §aDeposited ₹" + value
     );
 }
-```
 
 }
