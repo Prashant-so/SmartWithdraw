@@ -8,8 +8,8 @@ depend:
 - Vault
 
 commands:
-withdraw:
-description: Withdraw money into notes
+  withdraw:
+    description: Withdraw money into notes
 usage: /withdraw <amount>
 
 smartwithdraw:
