@@ -1,78 +1,46 @@
-package com.smartwithdraw.listener;
+package com.smartwithdraw.economy;
 
-import com.smartwithdraw.economy.EconomyManager;
-import org.bukkit.Material;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.inventory.ItemStack;
+import net.milkbowl.vault.economy.Economy;
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
+import org.bukkit.plugin.RegisteredServiceProvider;
 
-import java.util.List;
+public final class EconomyManager {
 
-public class NoteRedeemListener implements Listener {
+```
+private static Economy economy;
 
-@EventHandler
-public void onRedeem(PlayerInteractEvent event) {
-
-    ItemStack item = event.getItem();
-
-    if (item == null) {
-        return;
-    }
-
-    if (item.getType() != Material.PAPER) {
-        return;
-    }
-
-    if (!item.hasItemMeta()) {
-        return;
-    }
-
-    if (!item.getItemMeta().hasLore()) {
-        return;
-    }
-
-    List<String> lore = item.getItemMeta().getLore();
-
-    if (lore == null) {
-        return;
-    }
-
-    int value = -1;
-
-    for (String line : lore) {
-
-        if (line.contains("Value:")) {
-
-            String cleaned = line
-                    .replace("§fValue: §a₹", "")
-                    .replace(",", "")
-                    .trim();
-
-            try {
-                value = Integer.parseInt(cleaned);
-            } catch (Exception ignored) {
-            }
-
-            break;
-        }
-    }
-
-    if (value <= 0) {
-        return;
-    }
-
-    EconomyManager.deposit(event.getPlayer(), value);
-
-    if (item.getAmount() > 1) {
-        item.setAmount(item.getAmount() - 1);
-    } else {
-        event.getPlayer().getInventory().remove(item);
-    }
-
-    event.getPlayer().sendMessage(
-            "§6§lSmartWithdraw §8» §aDeposited ₹" + value
-    );
+private EconomyManager() {
 }
+
+public static boolean setupEconomy() {
+
+    RegisteredServiceProvider<Economy> provider =
+            Bukkit.getServicesManager().getRegistration(Economy.class);
+
+    if (provider == null) {
+        return false;
+    }
+
+    economy = provider.getProvider();
+    return economy != null;
+}
+
+public static Economy getEconomy() {
+    return economy;
+}
+
+public static boolean has(Player player, double amount) {
+    return economy.has(player, amount);
+}
+
+public static void withdraw(Player player, double amount) {
+    economy.withdrawPlayer(player, amount);
+}
+
+public static void deposit(Player player, double amount) {
+    economy.depositPlayer(player, amount);
+}
+```
 
 }
