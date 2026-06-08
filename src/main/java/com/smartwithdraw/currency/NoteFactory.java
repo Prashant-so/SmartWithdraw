@@ -13,7 +13,6 @@ import java.util.UUID;
 
 public final class NoteFactory {
 
-```
 private NoteFactory() {
 }
 
@@ -100,6 +99,5 @@ private static String getName(int value) {
         default -> "§f✦ ₹" + value + " Note ✦";
     };
 }
-```
 
 }
