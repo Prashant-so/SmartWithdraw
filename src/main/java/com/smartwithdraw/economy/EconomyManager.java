@@ -7,7 +7,6 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 
 public final class EconomyManager {
 
-```
 private static Economy economy;
 
 private EconomyManager() {
@@ -41,6 +40,5 @@ public static void withdraw(Player player, double amount) {
 public static void deposit(Player player, double amount) {
     economy.depositPlayer(player, amount);
 }
-```
 
 }
