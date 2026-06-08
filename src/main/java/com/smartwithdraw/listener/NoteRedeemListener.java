@@ -16,7 +16,6 @@ import org.bukkit.persistence.PersistentDataType;
 
 public class NoteRedeemListener implements Listener {
 
-```
 @EventHandler
 public void onRedeem(PlayerInteractEvent event) {
 
@@ -69,6 +68,5 @@ public void onRedeem(PlayerInteractEvent event) {
 
     event.setCancelled(true);
 }
-```
 
 }
