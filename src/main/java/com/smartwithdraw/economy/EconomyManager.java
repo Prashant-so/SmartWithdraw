@@ -1,43 +1,80 @@
-package com.smartwithdraw.economy;
+package com.smartwithdraw.listener;
 
-import net.milkbowl.vault.economy.Economy;
-import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
-import org.bukkit.plugin.RegisteredServiceProvider;
+import com.smartwithdraw.economy.EconomyManager;
+import org.bukkit.Material;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.ItemStack;
 
-public final class EconomyManager {
+import java.util.List;
 
-    private static Economy economy;
+public class NoteRedeemListener implements Listener {
 
-    private EconomyManager() {
+```
+@EventHandler
+public void onRedeem(PlayerInteractEvent event) {
+
+    ItemStack item = event.getItem();
+
+    if (item == null) {
+        return;
     }
 
-    public static boolean setupEconomy() {
+    if (item.getType() != Material.PAPER) {
+        return;
+    }
 
-        RegisteredServiceProvider<Economy> provider =
-                Bukkit.getServicesManager().getRegistration(Economy.class);
+    if (!item.hasItemMeta()) {
+        return;
+    }
 
-        if (provider == null) {
-            return false;
+    if (!item.getItemMeta().hasLore()) {
+        return;
+    }
+
+    List<String> lore = item.getItemMeta().getLore();
+
+    if (lore == null) {
+        return;
+    }
+
+    int value = -1;
+
+    for (String line : lore) {
+
+        if (line.contains("Value:")) {
+
+            String cleaned = line
+                    .replace("§fValue: §a₹", "")
+                    .replace(",", "")
+                    .trim();
+
+            try {
+                value = Integer.parseInt(cleaned);
+            } catch (Exception ignored) {
+            }
+
+            break;
         }
-
-        economy = provider.getProvider();
-        return economy != null;
     }
 
-    public static Economy getEconomy() {
-        return economy;
+    if (value <= 0) {
+        return;
     }
 
-    public static boolean has(Player player, double amount) {
-        return economy.has(player, amount);
+    EconomyManager.deposit(event.getPlayer(), value);
+
+    if (item.getAmount() > 1) {
+        item.setAmount(item.getAmount() - 1);
+    } else {
+        event.getPlayer().getInventory().remove(item);
     }
 
-    public static void withdraw(Player player, double amount) {
-        economy.withdrawPlayer(player, amount);
-    }
+    event.getPlayer().sendMessage(
+            "§6§lSmartWithdraw §8» §aDeposited ₹" + value
+    );
+}
+```
 
-    public static void deposit(Player player, double amount) {
-        economy.depositPlayer(player, amount);
-    }
 }
