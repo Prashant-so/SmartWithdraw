@@ -1,5 +1,6 @@
 package com.smartwithdraw;
 
+import com.smartwithdraw.command.SmartWithdrawCommand;
 import com.smartwithdraw.command.WithdrawCommand;
 import com.smartwithdraw.economy.EconomyManager;
 import com.smartwithdraw.listener.NoteRedeemListener;
@@ -8,7 +9,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public final class SmartWithdraw extends JavaPlugin {
 
-
+```
 private static SmartWithdraw instance;
 
 @Override
@@ -24,6 +25,10 @@ public void onEnable() {
 
     if (getCommand("withdraw") != null) {
         getCommand("withdraw").setExecutor(new WithdrawCommand());
+    }
+
+    if (getCommand("smartwithdraw") != null) {
+        getCommand("smartwithdraw").setExecutor(new SmartWithdrawCommand());
     }
 
     getServer().getPluginManager().registerEvents(
@@ -48,6 +53,6 @@ public void onDisable() {
 public static SmartWithdraw getInstance() {
     return instance;
 }
-
+```
 
 }
