@@ -14,7 +14,9 @@ usage: /withdraw <amount>
 
 smartwithdraw:
 description: SmartWithdraw Help
-aliases: [sw]
+usage: /smartwithdraw
+aliases:
+- sw
 
 permissions:
 smartwithdraw.withdraw:
