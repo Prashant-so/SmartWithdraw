@@ -12,7 +12,6 @@ import java.util.List;
 
 public class DepositCommand implements CommandExecutor {
 
-```
 @Override
 public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
 
@@ -74,6 +73,5 @@ public boolean onCommand(CommandSender sender, Command command, String label, St
 
     return true;
 }
-```
 
 }
