@@ -1,77 +1,75 @@
 package com.smartwithdraw.command;
 
+import com.smartwithdraw.SmartWithdraw;
 import com.smartwithdraw.economy.EconomyManager;
-import org.bukkit.Material;
+import com.smartwithdraw.security.NoteValidator;
+import org.bukkit.NamespacedKey;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-
-import java.util.List;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
 
 public class DepositCommand implements CommandExecutor {
 
-@Override
-public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+    @Override
+    public boolean onCommand(CommandSender sender,
+                             Command command,
+                             String label,
+                             String[] args) {
 
-    if (!(sender instanceof Player player)) {
-        return true;
-    }
-
-    int deposited = 0;
-
-    for (ItemStack item : player.getInventory().getContents()) {
-
-        if (item == null || item.getType() != Material.PAPER) {
-            continue;
+        if (!(sender instanceof Player player)) {
+            return true;
         }
 
-        if (!item.hasItemMeta() || !item.getItemMeta().hasLore()) {
-            continue;
-        }
+        int deposited = 0;
 
-        List<String> lore = item.getItemMeta().getLore();
+        NamespacedKey valueKey =
+                new NamespacedKey(
+                        SmartWithdraw.getInstance(),
+                        "note_value"
+                );
 
-        if (lore == null) {
-            continue;
-        }
+        for (ItemStack item : player.getInventory().getContents()) {
 
-        for (String line : lore) {
-
-            if (line.contains("Value:")) {
-
-                try {
-
-                    int value = Integer.parseInt(
-                            line.replace("§fValue: §a₹", "")
-                                    .replace(",", "")
-                                    .trim()
-                    );
-
-                    deposited += value * item.getAmount();
-                    player.getInventory().remove(item);
-
-                } catch (Exception ignored) {
-                }
-
-                break;
+            if (!NoteValidator.isValid(item)) {
+                continue;
             }
-        }
-    }
 
-    if (deposited <= 0) {
-        player.sendMessage("§cYou have no notes to deposit.");
+            ItemMeta meta = item.getItemMeta();
+
+            if (meta == null) {
+                continue;
+            }
+
+            Integer value = meta.getPersistentDataContainer().get(
+                    valueKey,
+                    PersistentDataType.INTEGER
+            );
+
+            if (value == null || value <= 0) {
+                continue;
+            }
+
+            deposited += value * item.getAmount();
+            player.getInventory().remove(item);
+        }
+
+        if (deposited <= 0) {
+            player.sendMessage(
+                    "§cYou have no valid notes to deposit."
+            );
+            return true;
+        }
+
+        EconomyManager.deposit(player, deposited);
+
+        player.sendMessage(
+                "§6§lSmartWithdraw §8» §aDeposited ₹" + deposited
+        );
+
         return true;
     }
-
-    EconomyManager.deposit(player, deposited);
-
-    player.sendMessage(
-            "§6§lSmartWithdraw §8» §aDeposited ₹" + deposited
-    );
-
-    return true;
-}
-
 }
