@@ -1,74 +1,96 @@
 package com.smartwithdraw.command;
 
 import com.smartwithdraw.SmartWithdraw;
-import com.smartwithdraw.economy.EconomyManager;
+import com.smartwithdraw.balance.BalanceProvider;
+import com.smartwithdraw.balance.BalanceProviderRegistry;
+import com.smartwithdraw.currency.Currency;
+import com.smartwithdraw.logging.TransactionLogger;
+import com.smartwithdraw.security.NoteInfo;
 import com.smartwithdraw.security.NoteValidator;
-import org.bukkit.NamespacedKey;
+import com.smartwithdraw.util.CooldownManager;
+import com.smartwithdraw.util.Lang;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.persistence.PersistentDataType;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 
 public class DepositCommand implements CommandExecutor {
 
     @Override
     public boolean onCommand(CommandSender sender,
-                             Command command,
-                             String label,
-                             String[] args) {
+                              Command command,
+                              String label,
+                              String[] args) {
 
         if (!(sender instanceof Player player)) {
             return true;
         }
 
-        int deposited = 0;
+        SmartWithdraw plugin = SmartWithdraw.getInstance();
 
-        NamespacedKey valueKey =
-                new NamespacedKey(
-                        SmartWithdraw.getInstance(),
-                        "note_value"
-                );
+        int cooldownSeconds = plugin.getConfig()
+                .getInt("limits.deposit-cooldown-seconds", 0);
 
-        for (ItemStack item : player.getInventory().getContents()) {
+        long remaining = CooldownManager.remainingDepositSeconds(player, cooldownSeconds);
 
-            if (!NoteValidator.isValid(item)) {
-                continue;
-            }
-
-            ItemMeta meta = item.getItemMeta();
-
-            if (meta == null) {
-                continue;
-            }
-
-            Integer value = meta.getPersistentDataContainer().get(
-                    valueKey,
-                    PersistentDataType.INTEGER
-            );
-
-            if (value == null || value <= 0) {
-                continue;
-            }
-
-            deposited += value * item.getAmount();
-            player.getInventory().remove(item);
-        }
-
-        if (deposited <= 0) {
-            player.sendMessage(
-                    "§cYou have no valid notes to deposit."
-            );
+        if (remaining > 0) {
+            Lang.send(player, "on-cooldown", Map.of("seconds", String.valueOf(remaining)));
             return true;
         }
 
-        EconomyManager.deposit(player, deposited);
+        Map<String, Long> depositedByCurrency = new HashMap<>();
+        Map<String, Currency> currencyById = new HashMap<>();
 
-        player.sendMessage(
-                "§6§lSmartWithdraw §8» §aDeposited ₹" + deposited
-        );
+        for (ItemStack item : player.getInventory().getContents()) {
+
+            Optional<NoteInfo> info = NoteValidator.getInfo(item);
+
+            if (info.isEmpty()) {
+                continue;
+            }
+
+            NoteInfo note = info.get();
+
+            depositedByCurrency.merge(
+                    note.currency().id(),
+                    (long) note.value() * item.getAmount(),
+                    Long::sum
+            );
+
+            currencyById.put(note.currency().id(), note.currency());
+
+            player.getInventory().remove(item);
+        }
+
+        if (depositedByCurrency.isEmpty()) {
+            Lang.send(player, "no-notes-to-deposit");
+            return true;
+        }
+
+        for (Map.Entry<String, Long> entry : depositedByCurrency.entrySet()) {
+
+            Currency currency = currencyById.get(entry.getKey());
+            long amount = entry.getValue();
+
+            BalanceProvider provider = BalanceProviderRegistry.get(currency.backend());
+
+            if (provider == null || !provider.isAvailable()) {
+                Lang.send(player, "backend-unavailable", Map.of("currency", currency.id()));
+                continue;
+            }
+
+            provider.deposit(player, amount);
+            CooldownManager.markDeposit(player);
+            TransactionLogger.log("DEPOSIT", player, currency.id(), amount);
+
+            Lang.send(player, "deposit-success",
+                    Map.of("amount", currency.format(amount)));
+        }
 
         return true;
     }
