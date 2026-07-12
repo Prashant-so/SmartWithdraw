@@ -1,9 +1,12 @@
 package com.smartwithdraw.listener;
 
 import com.smartwithdraw.SmartWithdraw;
-import com.smartwithdraw.economy.EconomyManager;
+import com.smartwithdraw.balance.BalanceProvider;
+import com.smartwithdraw.balance.BalanceProviderRegistry;
+import com.smartwithdraw.logging.TransactionLogger;
+import com.smartwithdraw.security.NoteInfo;
 import com.smartwithdraw.security.NoteValidator;
-import org.bukkit.NamespacedKey;
+import com.smartwithdraw.util.Lang;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -11,82 +14,81 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.persistence.PersistentDataType;
+
+import java.util.Map;
+import java.util.Optional;
 
 public class NoteRedeemListener implements Listener {
 
-@EventHandler
-public void onRedeem(PlayerInteractEvent event) {
+    @EventHandler
+    public void onRedeem(PlayerInteractEvent event) {
 
-    if (event.getHand() != EquipmentSlot.HAND) {
-        return;
-    }
+        if (!SmartWithdraw.getInstance().getConfig()
+                .getBoolean("notes.right-click-deposit", true)) {
+            return;
+        }
 
-    if (event.getAction() != Action.RIGHT_CLICK_AIR
-            && event.getAction() != Action.RIGHT_CLICK_BLOCK) {
-        return;
-    }
+        if (event.getHand() != EquipmentSlot.HAND) {
+            return;
+        }
 
-    ItemStack item = event.getItem();
+        if (event.getAction() != Action.RIGHT_CLICK_AIR
+                && event.getAction() != Action.RIGHT_CLICK_BLOCK) {
+            return;
+        }
 
-    if (item == null) {
-        return;
-    }
+        ItemStack item = event.getItem();
 
-    if (!NoteValidator.isValid(item)) {
-        return;
-    }
+        if (item == null) {
+            return;
+        }
 
-    ItemMeta meta = item.getItemMeta();
+        Optional<NoteInfo> infoOpt = NoteValidator.getInfo(item);
 
-    if (meta == null) {
-        return;
-    }
+        if (infoOpt.isEmpty()) {
+            return;
+        }
 
-    NamespacedKey valueKey =
-            new NamespacedKey(SmartWithdraw.getInstance(), "note_value");
+        NoteInfo info = infoOpt.get();
 
-    Integer value = meta.getPersistentDataContainer().get(
-            valueKey,
-            PersistentDataType.INTEGER
-    );
+        if (!info.currency().enabled()) {
+            return;
+        }
 
-    if (value == null || value <= 0) {
-        return;
-    }
+        BalanceProvider provider = BalanceProviderRegistry.get(info.currency().backend());
 
-    Player player = event.getPlayer();
+        if (provider == null || !provider.isAvailable()) {
+            Lang.send(event.getPlayer(), "backend-unavailable",
+                    Map.of("currency", info.currency().id()));
+            return;
+        }
 
-    if (player.isSneaking() && item.getAmount() > 1) {
+        Player player = event.getPlayer();
 
-        int total = value * item.getAmount();
+        long total;
 
-        EconomyManager.deposit(player, total);
+        if (player.isSneaking() && item.getAmount() > 1) {
 
-        player.getInventory().setItemInMainHand(null);
+            total = (long) info.value() * item.getAmount();
+            player.getInventory().setItemInMainHand(null);
 
-        player.sendMessage(
-                "§6§lSmartWithdraw §8» §aDeposited ₹" + total
-        );
+        } else {
+
+            total = info.value();
+
+            if (item.getAmount() > 1) {
+                item.setAmount(item.getAmount() - 1);
+            } else {
+                player.getInventory().setItemInMainHand(null);
+            }
+        }
+
+        provider.deposit(player, total);
+        TransactionLogger.log("DEPOSIT", player, info.currency().id(), total);
+
+        Lang.send(player, "deposit-success",
+                Map.of("amount", info.currency().format(total)));
 
         event.setCancelled(true);
-        return;
     }
-
-    EconomyManager.deposit(player, value);
-
-    if (item.getAmount() > 1) {
-        item.setAmount(item.getAmount() - 1);
-    } else {
-        player.getInventory().setItemInMainHand(null);
-    }
-
-    player.sendMessage(
-            "§6§lSmartWithdraw §8» §aDeposited ₹" + value
-    );
-
-    event.setCancelled(true);
-}
-
 }
