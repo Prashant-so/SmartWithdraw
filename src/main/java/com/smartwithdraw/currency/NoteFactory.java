@@ -38,7 +38,7 @@ public final class NoteFactory {
         meta.setLore(buildLore(currency, value));
 
         if (SmartWithdraw.getInstance().getConfig().getBoolean("notes.glow-effect", false)) {
-            meta.addEnchant(Enchantment.LUCK, 1, true);
+            meta.addEnchant(Enchantment.LUCK_OF_THE_SEA, 1, true);
             meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
         }
 
