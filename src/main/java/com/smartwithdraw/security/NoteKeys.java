@@ -5,7 +5,8 @@ public final class NoteKeys {
     private NoteKeys() {
     }
 
-    public static final String VALUE = "value";
-    public static final String NOTE_ID = "note_id";
-    public static final String NOTE_TYPE = "bank_note";
+    public static final String NOTE_VALUE = "note_value";
+    public static final String NOTE_MARKER = "smartwithdraw_note";
+    public static final String NOTE_SIGNATURE = "note_signature";
+    public static final String NOTE_CURRENCY = "note_currency";
 }
