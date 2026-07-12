@@ -1,22 +1,25 @@
 name: SmartWithdraw
-version: 1.0.0
+version: 2.0.0
 main: com.smartwithdraw.SmartWithdraw
 api-version: '1.21'
 
 depend:
+  - Vault
 
-- Vault
+softdepend:
+  - PlaceholderAPI
+  - PlayerPoints
 
 commands:
   withdraw:
     description: Withdraw money into notes
-    usage: /withdraw <amount>
-    
+    usage: /withdraw <amount> [currency]
+    permission: smartwithdraw.withdraw
+
   deposit:
     description: Deposit all notes
     usage: /deposit
-    aliases:
-      -sw
+    permission: smartwithdraw.deposit
 
   smartwithdraw:
     description: SmartWithdraw Help
@@ -27,3 +30,17 @@ commands:
 permissions:
   smartwithdraw.withdraw:
     default: true
+  smartwithdraw.deposit:
+    default: true
+  smartwithdraw.gui:
+    default: true
+  smartwithdraw.currency.coins:
+    default: true
+  smartwithdraw.currency.points:
+    default: true
+  smartwithdraw.currency.xp:
+    default: true
+  smartwithdraw.admin.give:
+    default: op
+  smartwithdraw.admin.reload:
+    default: op
