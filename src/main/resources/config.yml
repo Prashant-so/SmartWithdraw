@@ -5,16 +5,13 @@
 branding:
   server-name: "YourServerName"
 
-# Define as many currencies as you want. Each one gets its own note
-# skin, name, denomination list, BACKEND (actual balance it draws
-# from), and a Satchel-style tooltip.
+# ── CURRENCIES ───────────────────────────────────────────────────────
+# backend options: VAULT, PLAYERPOINTS, XP
+# material: any valid Bukkit Material name
+# expiry-days: 0 = never expires
+# daily-limit: 0 = unlimited withdrawals per 24hr rolling window
+# allowed-worlds: [] = all worlds allowed (including Multiverse worlds)
 #
-# backend options:
-#   VAULT        - your Vault-linked economy plugin (e.g. EssentialsX)
-#   PLAYERPOINTS - PlayerPoints plugin balance (requires PlayerPoints installed)
-#   XP           - the player's own experience points/levels (no plugin needed)
-#
-# Exactly one currency should have "default: true".
 currencies:
   coins:
     enabled: true
@@ -26,12 +23,32 @@ currencies:
     denominations: [1, 10, 50, 100, 500, 2000]
     model-data-base: 1000
     backend: VAULT
+    material: GOLD_NUGGET
+    expiry-days: 0
+    daily-limit: 0
+    allowed-worlds: []
+    tax:
+      percent: 0.0
+      apply-on-withdraw: false
+      apply-on-deposit: false
     lore:
       title-color: "&e"
       show-tier: true
       tier: "Common Tier"
       gain-text: "money"
-      tax-percent: 0.0
+      template:
+        - "&7Use this %type% to gain money!"
+        - ""
+        - "&f&lInformation:"
+        - "&7- Value: &a%value%"
+        - "&7- Created by: &6%server%, on %date%"
+        - "&7- Expires in: &e%expiry%"
+        - ""
+        - "&7- Tax: &c%tax%"
+        - ""
+        - "&7[Right-Click to use]"
+        - "&8[Shift+Right-Click stack to deposit all]"
+        - "&8[Sneak+Left-Click to split]"
 
   points:
     enabled: true
@@ -43,12 +60,32 @@ currencies:
     denominations: [1, 10, 50, 100]
     model-data-base: 9000
     backend: PLAYERPOINTS
+    material: NETHER_STAR
+    expiry-days: 0
+    daily-limit: 0
+    allowed-worlds: []
+    tax:
+      percent: 0.0
+      apply-on-withdraw: false
+      apply-on-deposit: false
     lore:
       title-color: "&a"
       show-tier: false
       tier: "Common Tier"
       gain-text: "game points"
-      tax-percent: 0.0
+      template:
+        - "&7Use this %type% to gain game points!"
+        - ""
+        - "&f&lInformation:"
+        - "&7- Value: &a%value%"
+        - "&7- Created by: &6%server%, on %date%"
+        - "&7- Expires in: &e%expiry%"
+        - ""
+        - "&7- Tax: &c%tax%"
+        - ""
+        - "&7[Right-Click to use]"
+        - "&8[Shift+Right-Click stack to deposit all]"
+        - "&8[Sneak+Left-Click to split]"
 
   xp:
     enabled: true
@@ -60,75 +97,109 @@ currencies:
     denominations: [1, 10, 30, 100]
     model-data-base: 9500
     backend: XP
+    material: EXPERIENCE_BOTTLE
+    expiry-days: 0
+    daily-limit: 0
+    allowed-worlds: []
+    tax:
+      percent: 0.0
+      apply-on-withdraw: false
+      apply-on-deposit: false
     lore:
       title-color: "&e"
       show-tier: true
       tier: "Common Tier"
       gain-text: "experience"
-      tax-percent: 0.0
+      template:
+        - "&7Use this %type% to gain experience!"
+        - ""
+        - "&f&lInformation:"
+        - "&7- Value: &a%value%"
+        - "&7- Created by: &6%server%, on %date%"
+        - "&7- Expires in: &e%expiry%"
+        - ""
+        - "&7- Tax: &c%tax%"
+        - ""
+        - "&7[Right-Click to use]"
+        - "&8[Shift+Right-Click stack to deposit all]"
+        - "&8[Sneak+Left-Click to split]"
 
+# ── NOTES ────────────────────────────────────────────────────────────
 notes:
   right-click-deposit: true
-  deposit-method: RIGHT_CLICK
-
-  # false -> withdrawing an amount gives ONE custom note for the exact
-  #          amount (e.g. /withdraw 2500 -> one "$2500" note)
-  # true  -> withdrawing an amount is broken into the fewest real
-  #          notes possible using the denominations above
-  #          (e.g. /withdraw 2500 -> one $2000 note + one $500 note)
   auto-split-notes: false
-
-  # true -> sneak + left-click a note to manually break it into
-  #         smaller denominations at any time (independent of the
-  #         auto-split-notes setting above)
   allow-splitting: true
-
-  # purely cosmetic: adds an enchantment glint to note items
   glow-effect: false
-
-  # what to call note items in their tooltip title, e.g.
-  # "Money Satchel", "Money Note", "Money Voucher"
   type-label: "Satchel"
 
+# ── SOUNDS ───────────────────────────────────────────────────────────
+# Set enabled: false to disable all sounds.
+# Sound names are Bukkit Sound enum values.
+sounds:
+  enabled: true
+  withdraw: "ITEM_BOOK_PAGE_TURN"
+  deposit: "ENTITY_EXPERIENCE_ORB_PICKUP"
+  split: "ENTITY_ITEM_PICKUP"
+  expire: "ENTITY_ITEM_BREAK"
+  volume: 1.0
+  pitch: 1.0
+
+# ── LIMITS ───────────────────────────────────────────────────────────
 limits:
-  # seconds a player must wait between /withdraw uses (0 = disabled)
   withdraw-cooldown-seconds: 5
-  # seconds a player must wait between /deposit uses (0 = disabled)
   deposit-cooldown-seconds: 0
-  # maximum total note value (per currency) a player may hold at once (0 = unlimited)
   max-held-value: 0
 
+# ── EXPIRY ───────────────────────────────────────────────────────────
+expiry:
+  # How often (in seconds) to scan online players' inventories
+  # for expired notes. 0 = disable periodic scan (only checked on deposit).
+  scan-interval-seconds: 30
+
+# ── LOGGING ──────────────────────────────────────────────────────────
 logging:
   enabled: true
   file: "transactions.log"
 
-# Auto-generated on first run, do not share this value.
-# It is used to cryptographically sign notes so they cannot be forged.
+# ── SECURITY ─────────────────────────────────────────────────────────
+# Auto-generated on first run. Do not share or edit this value.
 security:
   secret: ""
 
+# ── RESOURCE PACK ────────────────────────────────────────────────────
 resource-pack:
   enabled: false
   force: false
   url: ""
   sha1: ""
 
+# ── MESSAGES ─────────────────────────────────────────────────────────
+# Action bar messages (shown above hotbar): withdraw-success,
+# deposit-success, split-success.
+# All other messages go to chat.
 messages:
   prefix: "&6&lSmartWithdraw &8» "
-  withdraw-success: "&aSuccessfully withdrew &f%amount%"
-  insufficient-funds: "&cYou do not have enough money."
-  invalid-amount: "&cPlease enter a valid amount."
-  deposit-success: "&aDeposited &f%amount%"
-  no-notes-to-deposit: "&cYou have no valid notes to deposit."
-  no-permission: "&cYou do not have permission to do that."
-  on-cooldown: "&cPlease wait %seconds%s before doing that again."
-  held-limit-exceeded: "&cYou can only hold %limit% at once."
-  invalid-note-detected: "&cThat note failed verification and was rejected."
-  reload-success: "&aConfiguration reloaded."
-  give-success: "&aGave %player% %amount%."
-  give-received: "&aYou received %amount% from an admin."
-  unknown-currency: "&cUnknown currency: %currency%"
-  cannot-split: "&cThis note cannot be split any smaller."
-  split-success: "&aSplit a %amount% note into smaller notes."
-  backend-unavailable: "&c%currency% is currently unavailable (its plugin may be missing)."
-  currency-disabled: "&cThat currency is currently disabled."
+  withdraw-success: "&a&l✦ &aWithdrew &f%amount% &a✦"
+  withdraw-success-taxed: "&a&l✦ &aWithdrew &f%amount% &8(&c-%tax% tax&8) &a✦"
+  insufficient-funds: "&c&l✖ &cInsufficient balance."
+  invalid-amount: "&c&l✖ &cPlease enter a valid positive amount."
+  deposit-success: "&a&l✦ &aDeposited &f%amount% &a✦"
+  deposit-success-taxed: "&a&l✦ &aDeposited &f%amount% &8(&c-%tax% tax&8) &a✦"
+  no-notes-to-deposit: "&c&l✖ &cYou have no valid notes to deposit."
+  no-permission: "&c&l✖ &cYou do not have permission."
+  on-cooldown: "&c&l⏳ &cPlease wait &f%seconds%s &cbefore doing that again."
+  held-limit-exceeded: "&c&l✖ &cYou can only hold &f%limit% &cat once."
+  invalid-note-detected: "&c&l✖ &cThat note failed verification and was rejected."
+  reload-success: "&a&l✔ &aConfiguration reloaded successfully."
+  give-success: "&a&l✔ &aGave &f%player% &f%amount%&a."
+  give-received: "&a&l✦ &aYou received &f%amount%&a from an admin."
+  give-pending: "&a&l✔ &f%player% &ais offline. Notes will be delivered on their next login."
+  unknown-currency: "&c&l✖ &cUnknown currency: &f%currency%"
+  cannot-split: "&c&l✖ &cThis note cannot be split any further."
+  split-success: "&a&l✦ &aSplit &f%amount% &ainto smaller notes &a✦"
+  backend-unavailable: "&c&l✖ &c%currency% backend is currently unavailable."
+  currency-disabled: "&c&l✖ &cThat currency is currently disabled."
+  daily-limit-reached: "&c&l✖ &cYou have reached your daily withdrawal limit of &f%limit%&c for &f%currency%&c. Resets in &f%reset%&c."
+  world-not-allowed: "&c&l✖ &cYou cannot use &f%currency% &cnotes in this world."
+  note-expired: "&4&l💀 &cYour &f%amount% %currency% %type% &chas expired and was destroyed."
+  daily-limit-info: "&7Daily withdrawn: &f%used%&7/&f%limit% &7(&f%currency%&7) — resets in &e%reset%"
