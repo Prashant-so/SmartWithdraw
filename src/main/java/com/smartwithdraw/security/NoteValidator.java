@@ -23,28 +23,14 @@ public final class NoteValidator {
     private NoteValidator() {
     }
 
-    /**
-     * Computes the signature for a given currency+value pair using the
-     * plugin's secret key. Notes of the same currency and value always
-     * get the same signature, so identical notes still stack normally.
-     */
     public static String sign(String currencyId, int value) {
-
         try {
-
             Mac mac = Mac.getInstance(HMAC_ALGORITHM);
-
-            mac.init(new SecretKeySpec(
-                    SecretKeyManager.getKey(),
-                    HMAC_ALGORITHM
-            ));
-
-            String payload = currencyId + ":" + value;
-
-            byte[] raw = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
-
+            mac.init(new SecretKeySpec(SecretKeyManager.getKey(), HMAC_ALGORITHM));
+            byte[] raw = mac.doFinal(
+                    (currencyId + ":" + value)
+                            .getBytes(StandardCharsets.UTF_8));
             return Base64.getEncoder().encodeToString(raw);
-
         } catch (Exception e) {
             throw new IllegalStateException("Unable to sign note", e);
         }
@@ -54,46 +40,64 @@ public final class NoteValidator {
         return getInfo(item).isPresent();
     }
 
-    public static Integer getValue(ItemStack item) {
-        return getInfo(item).map(NoteInfo::value).orElse(null);
+    /**
+     * Returns true if the note is valid AND not expired.
+     */
+    public static boolean isValidAndNotExpired(ItemStack item) {
+        Optional<NoteInfo> info = getInfo(item);
+        if (info.isEmpty()) return false;
+        return !isExpired(info.get());
+    }
+
+    public static boolean isExpired(NoteInfo info) {
+        int expiryDays = info.currency().expiryDays();
+        if (expiryDays <= 0) return false;
+        long expiryMs = info.createdAt() + (long) expiryDays * 86_400_000L;
+        return System.currentTimeMillis() > expiryMs;
     }
 
     /**
-     * Returns the verified currency + value of a note, or empty if the
-     * item is not a note, references an unknown/removed currency, or
-     * fails signature verification (i.e. was forged or edited).
+     * Returns days remaining until expiry, or -1 if no expiry set.
      */
+    public static long daysRemaining(NoteInfo info) {
+        int expiryDays = info.currency().expiryDays();
+        if (expiryDays <= 0) return -1;
+        long expiryMs  = info.createdAt() + (long) expiryDays * 86_400_000L;
+        long remaining = expiryMs - System.currentTimeMillis();
+        if (remaining <= 0) return 0;
+        return (long) Math.ceil(remaining / 86_400_000.0);
+    }
+
     public static Optional<NoteInfo> getInfo(ItemStack item) {
 
-        if (item == null || !item.hasItemMeta()) {
-            return Optional.empty();
-        }
+        if (item == null || !item.hasItemMeta()) return Optional.empty();
 
         ItemMeta meta = item.getItemMeta();
-
-        if (meta == null) {
-            return Optional.empty();
-        }
+        if (meta == null) return Optional.empty();
 
         SmartWithdraw plugin = SmartWithdraw.getInstance();
 
-        NamespacedKey markerKey = new NamespacedKey(plugin, NoteKeys.NOTE_MARKER);
-        NamespacedKey valueKey = new NamespacedKey(plugin, NoteKeys.NOTE_VALUE);
-        NamespacedKey currencyKey = new NamespacedKey(plugin, NoteKeys.NOTE_CURRENCY);
+        NamespacedKey markerKey    = new NamespacedKey(plugin, NoteKeys.NOTE_MARKER);
+        NamespacedKey valueKey     = new NamespacedKey(plugin, NoteKeys.NOTE_VALUE);
+        NamespacedKey currencyKey  = new NamespacedKey(plugin, NoteKeys.NOTE_CURRENCY);
         NamespacedKey signatureKey = new NamespacedKey(plugin, NoteKeys.NOTE_SIGNATURE);
+        NamespacedKey createdKey   = new NamespacedKey(plugin, NoteKeys.NOTE_CREATED);
 
         PersistentDataContainer pdc = meta.getPersistentDataContainer();
 
-        if (!pdc.has(markerKey, PersistentDataType.BYTE)
-                || !pdc.has(valueKey, PersistentDataType.INTEGER)
-                || !pdc.has(currencyKey, PersistentDataType.STRING)
-                || !pdc.has(signatureKey, PersistentDataType.STRING)) {
+        if (!pdc.has(markerKey,    PersistentDataType.BYTE)
+         || !pdc.has(valueKey,     PersistentDataType.INTEGER)
+         || !pdc.has(currencyKey,  PersistentDataType.STRING)
+         || !pdc.has(signatureKey, PersistentDataType.STRING)) {
             return Optional.empty();
         }
 
-        Integer value = pdc.get(valueKey, PersistentDataType.INTEGER);
-        String currencyId = pdc.get(currencyKey, PersistentDataType.STRING);
-        String signature = pdc.get(signatureKey, PersistentDataType.STRING);
+        Integer value     = pdc.get(valueKey,     PersistentDataType.INTEGER);
+        String  currencyId = pdc.get(currencyKey,  PersistentDataType.STRING);
+        String  signature = pdc.get(signatureKey, PersistentDataType.STRING);
+        Long    createdAt = pdc.has(createdKey, PersistentDataType.LONG)
+                ? pdc.get(createdKey, PersistentDataType.LONG)
+                : 0L;
 
         if (value == null || value <= 0 || currencyId == null || signature == null) {
             return Optional.empty();
@@ -103,15 +107,12 @@ public final class NoteValidator {
 
         boolean matches = MessageDigest.isEqual(
                 signature.getBytes(StandardCharsets.UTF_8),
-                expected.getBytes(StandardCharsets.UTF_8)
-        );
+                expected.getBytes(StandardCharsets.UTF_8));
 
-        if (!matches) {
-            return Optional.empty();
-        }
+        if (!matches) return Optional.empty();
 
         Optional<Currency> currency = CurrencyManager.get(currencyId);
 
-        return currency.map(c -> new NoteInfo(c, value));
+        return currency.map(c -> new NoteInfo(c, value, createdAt));
     }
 }
