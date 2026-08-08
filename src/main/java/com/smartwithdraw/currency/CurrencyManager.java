@@ -1,6 +1,7 @@
 package com.smartwithdraw.currency;
 
 import com.smartwithdraw.SmartWithdraw;
+import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 
 import java.util.LinkedHashMap;
@@ -21,7 +22,8 @@ public final class CurrencyManager {
         CURRENCIES.clear();
 
         SmartWithdraw plugin = SmartWithdraw.getInstance();
-        ConfigurationSection root = plugin.getConfig().getConfigurationSection("currencies");
+        ConfigurationSection root = plugin.getConfig()
+                .getConfigurationSection("currencies");
 
         if (root == null) {
             fallbackToDefault(plugin);
@@ -33,41 +35,61 @@ public final class CurrencyManager {
         for (String id : root.getKeys(false)) {
 
             ConfigurationSection section = root.getConfigurationSection(id);
-
-            if (section == null) {
-                continue;
-            }
+            if (section == null) continue;
 
             boolean isDefault = section.getBoolean("default", false);
-            boolean enabled = section.getBoolean("enabled", true);
+            boolean enabled   = section.getBoolean("enabled", true);
 
             List<Integer> denominations = section.getIntegerList("denominations");
-
             if (denominations.isEmpty()) {
                 denominations = List.of(1, 10, 50, 100, 500, 2000);
             }
 
             CurrencyBackend backend;
-
             try {
                 backend = CurrencyBackend.valueOf(
-                        section.getString("backend", "VAULT").toUpperCase()
-                );
+                        section.getString("backend", "VAULT").toUpperCase());
             } catch (IllegalArgumentException e) {
                 plugin.getLogger().warning(
-                        "Invalid backend for currency '" + id + "', defaulting to VAULT."
-                );
+                        "Invalid backend for '" + id + "', defaulting to VAULT.");
                 backend = CurrencyBackend.VAULT;
             }
 
+            Material material;
+            try {
+                material = Material.valueOf(
+                        section.getString("material", "PAPER").toUpperCase());
+            } catch (IllegalArgumentException e) {
+                plugin.getLogger().warning(
+                        "Invalid material for '" + id + "', defaulting to PAPER.");
+                material = Material.PAPER;
+            }
+
+            int expiryDays  = section.getInt("expiry-days", 0);
+            long dailyLimit = section.getLong("daily-limit", 0);
+            List<String> allowedWorlds = section.getStringList("allowed-worlds");
+
+            // Tax
+            ConfigurationSection taxSection = section.getConfigurationSection("tax");
+            TaxConfig tax = taxSection != null
+                    ? new TaxConfig(
+                            taxSection.getDouble("percent", 0.0),
+                            taxSection.getBoolean("apply-on-withdraw", false),
+                            taxSection.getBoolean("apply-on-deposit", false))
+                    : TaxConfig.NONE;
+
+            // Lore
             ConfigurationSection loreSection = section.getConfigurationSection("lore");
+            List<String> template = loreSection != null
+                    ? loreSection.getStringList("template")
+                    : List.of();
 
             LoreStyle lore = new LoreStyle(
                     loreSection != null ? loreSection.getString("title-color", "&f") : "&f",
                     loreSection != null && loreSection.getBoolean("show-tier", false),
                     loreSection != null ? loreSection.getString("tier", "Common Tier") : "Common Tier",
-                    loreSection != null ? loreSection.getString("gain-text", section.getString("name", id)) : section.getString("name", id),
-                    loreSection != null ? loreSection.getDouble("tax-percent", 0.0) : 0.0
+                    loreSection != null ? loreSection.getString("gain-text", id) : id,
+                    template
             );
 
             Currency currency = new Currency(
@@ -81,6 +103,11 @@ public final class CurrencyManager {
                     isDefault,
                     enabled,
                     backend,
+                    material,
+                    expiryDays,
+                    dailyLimit,
+                    allowedWorlds,
+                    tax,
                     lore
             );
 
@@ -105,20 +132,23 @@ public final class CurrencyManager {
     private static void fallbackToDefault(SmartWithdraw plugin) {
 
         plugin.getLogger().warning(
-                "No usable 'currencies' section found in config.yml — falling back to a single default currency."
-        );
+                "No 'currencies' section found — falling back to default currency.");
 
         CURRENCIES.put("coins", new Currency(
                 "coins", "$", "Money", "Money", "%symbol%%amount%",
-                List.of(1, 10, 50, 100, 500, 2000), 1000, true, true, CurrencyBackend.VAULT,
-                new LoreStyle("&e", true, "Common Tier", "money", 0.0)
+                List.of(1, 10, 50, 100, 500, 2000), 1000, true, true,
+                CurrencyBackend.VAULT, Material.GOLD_NUGGET,
+                0, 0, List.of(), TaxConfig.NONE,
+                new LoreStyle("&e", true, "Common Tier", "money", List.of())
         ));
 
         defaultCurrencyId = "coins";
     }
 
     public static Optional<Currency> get(String id) {
-        return id == null ? Optional.empty() : Optional.ofNullable(CURRENCIES.get(id.toLowerCase()));
+        return id == null
+                ? Optional.empty()
+                : Optional.ofNullable(CURRENCIES.get(id.toLowerCase()));
     }
 
     public static Currency getDefault() {
@@ -129,21 +159,10 @@ public final class CurrencyManager {
         return CURRENCIES;
     }
 
-    /**
-     * Only currencies with enabled: true - used everywhere a player
-     * picks/sees a currency (help text, GUI, /sw currencies).
-     */
     public static Map<String, Currency> getAllEnabled() {
-
-        Map<String, Currency> enabled = new LinkedHashMap<>();
-
-        for (Map.Entry<String, Currency> entry : CURRENCIES.entrySet()) {
-            if (entry.getValue().enabled()) {
-                enabled.put(entry.getKey(), entry.getValue());
-            }
-        }
-
-        return enabled;
+        Map<String, Currency> result = new LinkedHashMap<>();
+        CURRENCIES.forEach((k, v) -> { if (v.enabled()) result.put(k, v); });
+        return result;
     }
 
     public static boolean exists(String id) {
