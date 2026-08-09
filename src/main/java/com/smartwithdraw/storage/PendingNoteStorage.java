@@ -5,7 +5,6 @@ import com.smartwithdraw.currency.Currency;
 import com.smartwithdraw.currency.CurrencyManager;
 import com.smartwithdraw.currency.NoteFactory;
 import com.smartwithdraw.util.InventoryUtils;
-import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 
@@ -16,11 +15,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Stores notes for offline players in pending-notes.yml.
- * Each entry: UUID -> list of "currencyId:amount" strings.
- * Delivered and removed on next login.
- */
 public final class PendingNoteStorage {
 
     private static File file;
@@ -48,7 +42,6 @@ public final class PendingNoteStorage {
     }
 
     public static void addPendingNote(UUID uuid, String currencyId, int amount) {
-
         String key = uuid.toString();
         List<String> existing = config.getStringList(key);
         existing.add(currencyId + ":" + amount);
@@ -56,27 +49,19 @@ public final class PendingNoteStorage {
         save();
     }
 
-    /**
-     * Delivers all pending notes to the player and removes them from storage.
-     */
     public static void deliverPending(Player player) {
 
         String key = player.getUniqueId().toString();
         List<String> pending = config.getStringList(key);
 
-        if (pending.isEmpty()) {
-            return;
-        }
+        if (pending.isEmpty()) return;
 
         List<String> failed = new ArrayList<>();
 
         for (String entry : pending) {
 
             String[] parts = entry.split(":");
-
-            if (parts.length != 2) {
-                continue;
-            }
+            if (parts.length != 2) continue;
 
             String currencyId = parts[0];
             int amount;
@@ -90,29 +75,21 @@ public final class PendingNoteStorage {
             Optional<Currency> currency = CurrencyManager.get(currencyId);
 
             if (currency.isEmpty()) {
-                // Currency was removed from config since the note was stored
-                // — skip silently rather than losing the entry
                 failed.add(entry);
                 continue;
             }
 
-            InventoryUtils.give(player,
-                    NoteFactory.createNote(currency.get(), amount));
+            InventoryUtils.give(player, NoteFactory.createNote(currency.get(), amount));
 
-            player.sendMessage("§6§lSmartWithdraw §8» §aYou received a pending "
+            player.sendMessage(
+                    "§6§lSmartWithdraw §8» §aYou received a pending "
                     + currency.get().format(amount) + " "
                     + SmartWithdraw.getInstance().getConfig()
                             .getString("notes.type-label", "Satchel")
-                    + "§a from an admin.");
+                    + " §afrom an admin.");
         }
 
-        // Keep only failed entries (currency no longer exists)
-        if (failed.isEmpty()) {
-            config.set(key, null);
-        } else {
-            config.set(key, failed);
-        }
-
+        config.set(key, failed.isEmpty() ? null : failed);
         save();
     }
 
