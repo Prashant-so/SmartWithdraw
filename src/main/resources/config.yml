@@ -6,11 +6,11 @@ branding:
   server-name: "YourServerName"
 
 # ── CURRENCIES ───────────────────────────────────────────────────────
-# backend options: VAULT, PLAYERPOINTS, XP
+# backend: VAULT | PLAYERPOINTS | XP
 # material: any valid Bukkit Material name
 # expiry-days: 0 = never expires
-# daily-limit: 0 = unlimited withdrawals per 24hr rolling window
-# allowed-worlds: [] = all worlds allowed (including Multiverse worlds)
+# daily-limit: 0 = unlimited per 24hr rolling window
+# allowed-worlds: [] = all worlds allowed
 #
 currencies:
   coins:
@@ -133,8 +133,6 @@ notes:
   type-label: "Satchel"
 
 # ── SOUNDS ───────────────────────────────────────────────────────────
-# Set enabled: false to disable all sounds.
-# Sound names are Bukkit Sound enum values.
 sounds:
   enabled: true
   withdraw: "ITEM_BOOK_PAGE_TURN"
@@ -152,8 +150,6 @@ limits:
 
 # ── EXPIRY ───────────────────────────────────────────────────────────
 expiry:
-  # How often (in seconds) to scan online players' inventories
-  # for expired notes. 0 = disable periodic scan (only checked on deposit).
   scan-interval-seconds: 30
 
 # ── LOGGING ──────────────────────────────────────────────────────────
@@ -162,7 +158,6 @@ logging:
   file: "transactions.log"
 
 # ── SECURITY ─────────────────────────────────────────────────────────
-# Auto-generated on first run. Do not share or edit this value.
 security:
   secret: ""
 
@@ -174,9 +169,6 @@ resource-pack:
   sha1: ""
 
 # ── MESSAGES ─────────────────────────────────────────────────────────
-# Action bar messages (shown above hotbar): withdraw-success,
-# deposit-success, split-success.
-# All other messages go to chat.
 messages:
   prefix: "&6&lSmartWithdraw &8» "
   withdraw-success: "&a&l✦ &aWithdrew &f%amount% &a✦"
@@ -193,13 +185,13 @@ messages:
   reload-success: "&a&l✔ &aConfiguration reloaded successfully."
   give-success: "&a&l✔ &aGave &f%player% &f%amount%&a."
   give-received: "&a&l✦ &aYou received &f%amount%&a from an admin."
-  give-pending: "&a&l✔ &f%player% &ais offline. Notes will be delivered on their next login."
+  give-pending: "&a&l✔ &f%player% &ais offline. Notes will be delivered on login."
   unknown-currency: "&c&l✖ &cUnknown currency: &f%currency%"
   cannot-split: "&c&l✖ &cThis note cannot be split any further."
   split-success: "&a&l✦ &aSplit &f%amount% &ainto smaller notes &a✦"
   backend-unavailable: "&c&l✖ &c%currency% backend is currently unavailable."
   currency-disabled: "&c&l✖ &cThat currency is currently disabled."
-  daily-limit-reached: "&c&l✖ &cYou have reached your daily withdrawal limit of &f%limit%&c for &f%currency%&c. Resets in &f%reset%&c."
+  daily-limit-reached: "&c&l✖ &cDaily withdrawal limit of &f%limit% &creached for &f%currency%&c. Resets in &f%reset%&c."
   world-not-allowed: "&c&l✖ &cYou cannot use &f%currency% &cnotes in this world."
   note-expired: "&4&l💀 &cYour &f%amount% %currency% %type% &chas expired and was destroyed."
   daily-limit-info: "&7Daily withdrawn: &f%used%&7/&f%limit% &7(&f%currency%&7) — resets in &e%reset%"
