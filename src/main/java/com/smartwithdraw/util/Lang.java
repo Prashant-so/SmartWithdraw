@@ -1,6 +1,8 @@
 package com.smartwithdraw.util;
 
 import com.smartwithdraw.SmartWithdraw;
+import net.md_5.bungee.api.ChatMessageType;
+import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -8,12 +10,10 @@ import org.bukkit.entity.Player;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * These keys are shown on the action bar instead of chat when the
- * sender is a player — keeps success feedback unobtrusive.
- */
 public final class Lang {
 
+    // These keys are sent to action bar instead of chat when
+    // the sender is a player — keeps success feedback unobtrusive
     private static final Set<String> ACTION_BAR_KEYS = Set.of(
             "withdraw-success",
             "withdraw-success-taxed",
@@ -46,12 +46,15 @@ public final class Lang {
             raw = raw.replace("%" + entry.getKey() + "%", entry.getValue());
         }
 
-        String translated = ChatColor.translateAlternateColorCodes('&', raw);
-
         if (sender instanceof Player player && ACTION_BAR_KEYS.contains(key)) {
-            ActionBarUtil.send(player, raw);
+            player.spigot().sendMessage(
+                    ChatMessageType.ACTION_BAR,
+                    new TextComponent(
+                            ChatColor.translateAlternateColorCodes('&', raw)));
         } else {
-            sender.sendMessage(ChatColor.translateAlternateColorCodes('&', prefix) + translated);
+            String translated = ChatColor.translateAlternateColorCodes('&',
+                    prefix + raw);
+            sender.sendMessage(translated);
         }
     }
 }
