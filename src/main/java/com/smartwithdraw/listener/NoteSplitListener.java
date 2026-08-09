@@ -8,6 +8,7 @@ import com.smartwithdraw.security.NoteInfo;
 import com.smartwithdraw.security.NoteValidator;
 import com.smartwithdraw.util.InventoryUtils;
 import com.smartwithdraw.util.Lang;
+import com.smartwithdraw.util.SoundUtil;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -19,12 +20,6 @@ import org.bukkit.inventory.ItemStack;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * Sneak + left-click a note to break it into smaller denominations.
- * Independent of notes.auto-split-notes - that setting only affects
- * what /withdraw gives you; this lets a player manually break notes
- * at any time. Only enabled when notes.allow-splitting is true.
- */
 public class NoteSplitListener implements Listener {
 
     @EventHandler
@@ -35,9 +30,7 @@ public class NoteSplitListener implements Listener {
             return;
         }
 
-        if (event.getHand() != EquipmentSlot.HAND) {
-            return;
-        }
+        if (event.getHand() != EquipmentSlot.HAND) return;
 
         if (event.getAction() != Action.LEFT_CLICK_AIR
                 && event.getAction() != Action.LEFT_CLICK_BLOCK) {
@@ -46,23 +39,33 @@ public class NoteSplitListener implements Listener {
 
         Player player = event.getPlayer();
 
-        if (!player.isSneaking()) {
-            return;
-        }
+        if (!player.isSneaking()) return;
 
         ItemStack item = player.getInventory().getItemInMainHand();
 
         Optional<NoteInfo> info = NoteValidator.getInfo(item);
+        if (info.isEmpty()) return;
 
-        if (info.isEmpty()) {
+        NoteInfo  note     = info.get();
+        Currency  currency = note.currency();
+
+        // Expiry check
+        if (NoteValidator.isExpired(note)) {
+            NoteExpiryListener.scanAndDestroy(player);
+            event.setCancelled(true);
             return;
         }
 
-        NoteInfo note = info.get();
-        Currency currency = note.currency();
-        int value = note.value();
+        // World check
+        if (!currency.isWorldAllowed(player.getWorld().getName())) {
+            Lang.send(player, "world-not-allowed",
+                    Map.of("currency", currency.name()));
+            event.setCancelled(true);
+            return;
+        }
 
-        Map<Integer, Integer> breakdown = DenominationCalculator.splitDown(value, currency);
+        Map<Integer, Integer> breakdown =
+                DenominationCalculator.splitDown(note.value(), currency);
 
         if (breakdown.isEmpty()) {
             Lang.send(player, "cannot-split");
@@ -77,13 +80,15 @@ public class NoteSplitListener implements Listener {
 
         for (Map.Entry<Integer, Integer> entry : breakdown.entrySet()) {
             for (int i = 0; i < entry.getValue(); i++) {
-                InventoryUtils.give(player, NoteFactory.createNote(currency, entry.getKey()));
+                InventoryUtils.give(player,
+                        NoteFactory.createNote(currency, entry.getKey()));
             }
         }
 
-        Lang.send(player, "split-success", Map.of(
-                "amount", currency.format(value)
-        ));
+        SoundUtil.play(player, "split");
+
+        Lang.send(player, "split-success",
+                Map.of("amount", currency.format(note.value())));
 
         event.setCancelled(true);
     }
