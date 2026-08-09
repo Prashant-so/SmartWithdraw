@@ -20,14 +20,12 @@ public final class SoundUtil {
         String soundName = plugin.getConfig()
                 .getString("sounds." + configKey, "");
 
-        if (soundName == null || soundName.isBlank()) {
-            return;
-        }
+        if (soundName == null || soundName.isBlank()) return;
 
         try {
-            Sound sound = Sound.valueOf(soundName.toUpperCase());
+            Sound sound  = Sound.valueOf(soundName.toUpperCase());
             float volume = (float) plugin.getConfig().getDouble("sounds.volume", 1.0);
-            float pitch  = (float) plugin.getConfig().getDouble("sounds.pitch",  1.0);
+            float pitch  = (float) plugin.getConfig().getDouble("sounds.pitch", 1.0);
             player.playSound(player.getLocation(), sound, volume, pitch);
         } catch (IllegalArgumentException e) {
             plugin.getLogger().warning(
