@@ -27,10 +27,8 @@ import java.util.Map;
 public class WithdrawCommand implements CommandExecutor, TabCompleter {
 
     @Override
-    public boolean onCommand(CommandSender sender,
-                              Command command,
-                              String label,
-                              String[] args) {
+    public boolean onCommand(CommandSender sender, Command command,
+                              String label, String[] args) {
 
         if (!(sender instanceof Player player)) {
             sender.sendMessage("§cOnly players can use this command.");
@@ -43,13 +41,12 @@ public class WithdrawCommand implements CommandExecutor, TabCompleter {
         }
 
         SmartWithdraw plugin = SmartWithdraw.getInstance();
-        Currency currency = CurrencyManager.getDefault();
+        Currency currency    = CurrencyManager.getDefault();
 
         if (args.length == 2) {
             currency = CurrencyManager.get(args[1]).orElse(null);
             if (currency == null) {
-                Lang.send(player, "unknown-currency",
-                        Map.of("currency", args[1]));
+                Lang.send(player, "unknown-currency", Map.of("currency", args[1]));
                 return true;
             }
         }
@@ -59,7 +56,6 @@ public class WithdrawCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        // World check
         if (!currency.isWorldAllowed(player.getWorld().getName())) {
             Lang.send(player, "world-not-allowed",
                     Map.of("currency", currency.name()));
@@ -81,7 +77,6 @@ public class WithdrawCommand implements CommandExecutor, TabCompleter {
 
         int cooldownSeconds = plugin.getConfig()
                 .getInt("limits.withdraw-cooldown-seconds", 0);
-
         long remaining = CooldownManager.remainingWithdrawSeconds(
                 player, cooldownSeconds);
 
@@ -91,94 +86,98 @@ public class WithdrawCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        int amount;
         try {
-
-            int amount = Integer.parseInt(args[0]);
-
-            if (amount <= 0) {
+            long parsed = Long.parseLong(args[0]);
+            if (parsed <= 0 || parsed > Integer.MAX_VALUE) {
                 Lang.send(player, "invalid-amount");
                 return true;
             }
-
-            // Daily limit check
-            if (currency.hasDailyLimit()) {
-
-                boolean allowed = DailyLimitManager.tryWithdraw(
-                        player.getUniqueId(), currency.id(),
-                        amount, currency.dailyLimit());
-
-                if (!allowed) {
-                    Lang.send(player, "daily-limit-reached", Map.of(
-                            "limit",    currency.format(currency.dailyLimit()),
-                            "currency", currency.name(),
-                            "reset",    DailyLimitManager.resetString(
-                                    player.getUniqueId(), currency.id())
-                    ));
-                    return true;
-                }
-            }
-
-            // Tax on withdraw
-            TaxConfig tax      = currency.tax();
-            long taxAmount     = tax.applyOnWithdraw()
-                    ? tax.calculateTax(amount) : 0;
-            long totalDeduct   = amount + taxAmount;
-
-            if (!provider.has(player, totalDeduct)) {
-                Lang.send(player, "insufficient-funds");
-                return true;
-            }
-
-            long maxHeld = plugin.getConfig()
-                    .getLong("limits.max-held-value", 0);
-
-            if (maxHeld > 0) {
-                long currentlyHeld = InventoryUtils.sumHeldNoteValue(
-                        player, currency);
-                if (currentlyHeld + amount > maxHeld) {
-                    Lang.send(player, "held-limit-exceeded",
-                            Map.of("limit", currency.format(maxHeld)));
-                    return true;
-                }
-            }
-
-            provider.withdraw(player, totalDeduct);
-
-            boolean autoSplit = plugin.getConfig()
-                    .getBoolean("notes.auto-split-notes", false);
-
-            if (autoSplit) {
-                Map<Integer, Integer> notes =
-                        DenominationCalculator.calculate(amount, currency);
-                for (Map.Entry<Integer, Integer> entry : notes.entrySet()) {
-                    for (int i = 0; i < entry.getValue(); i++) {
-                        InventoryUtils.give(player,
-                                NoteFactory.createNote(currency, entry.getKey()));
-                    }
-                }
-            } else {
-                InventoryUtils.give(player,
-                        NoteFactory.createNote(currency, amount));
-            }
-
-            CooldownManager.markWithdraw(player);
-            TransactionLogger.log("WITHDRAW", player, currency.id(), amount);
-            SoundUtil.play(player, "withdraw");
-
-            if (taxAmount > 0) {
-                TransactionLogger.log("TAX_WITHDRAW", player,
-                        currency.id(), taxAmount);
-                Lang.send(player, "withdraw-success-taxed", Map.of(
-                        "amount", currency.format(amount),
-                        "tax",    currency.format(taxAmount)
-                ));
-            } else {
-                Lang.send(player, "withdraw-success",
-                        Map.of("amount", currency.format(amount)));
-            }
-
+            amount = (int) parsed;
         } catch (NumberFormatException ex) {
             Lang.send(player, "invalid-amount");
+            return true;
+        }
+
+        // Daily limit check — must happen BEFORE balance check so the
+        // limit isn't bypassed by checking balance first
+        if (currency.hasDailyLimit()) {
+            boolean allowed = DailyLimitManager.tryWithdraw(
+                    player.getUniqueId(), currency.id(),
+                    amount, currency.dailyLimit());
+            if (!allowed) {
+                Lang.send(player, "daily-limit-reached", Map.of(
+                        "limit",    currency.format(currency.dailyLimit()),
+                        "currency", currency.name(),
+                        "reset",    DailyLimitManager.resetString(
+                                player.getUniqueId(), currency.id())
+                ));
+                return true;
+            }
+        }
+
+        TaxConfig tax       = currency.tax();
+        long taxAmount      = tax.applyOnWithdraw() ? tax.calculateTax(amount) : 0;
+        long totalDeduct    = amount + taxAmount;
+
+        if (!provider.has(player, totalDeduct)) {
+            // Undo the daily limit reservation since we're not proceeding
+            // (DailyLimitManager doesn't have a rollback, so re-deduct
+            // from the recorded amount)
+            if (currency.hasDailyLimit()) {
+                DailyLimitManager.refund(
+                        player.getUniqueId(), currency.id(), amount);
+            }
+            Lang.send(player, "insufficient-funds");
+            return true;
+        }
+
+        long maxHeld = plugin.getConfig().getLong("limits.max-held-value", 0);
+        if (maxHeld > 0) {
+            long currentlyHeld = InventoryUtils.sumHeldNoteValue(player, currency);
+            if (currentlyHeld + amount > maxHeld) {
+                if (currency.hasDailyLimit()) {
+                    DailyLimitManager.refund(
+                            player.getUniqueId(), currency.id(), amount);
+                }
+                Lang.send(player, "held-limit-exceeded",
+                        Map.of("limit", currency.format(maxHeld)));
+                return true;
+            }
+        }
+
+        provider.withdraw(player, totalDeduct);
+
+        boolean autoSplit = plugin.getConfig()
+                .getBoolean("notes.auto-split-notes", false);
+
+        if (autoSplit) {
+            Map<Integer, Integer> notes =
+                    DenominationCalculator.calculate(amount, currency);
+            for (Map.Entry<Integer, Integer> entry : notes.entrySet()) {
+                for (int i = 0; i < entry.getValue(); i++) {
+                    InventoryUtils.give(player,
+                            NoteFactory.createNote(currency, entry.getKey()));
+                }
+            }
+        } else {
+            InventoryUtils.give(player, NoteFactory.createNote(currency, amount));
+        }
+
+        CooldownManager.markWithdraw(player);
+        TransactionLogger.log("WITHDRAW", player, currency.id(), amount);
+        SoundUtil.play(player, "withdraw");
+
+        if (taxAmount > 0) {
+            TransactionLogger.log("TAX_WITHDRAW", player,
+                    currency.id(), taxAmount);
+            Lang.send(player, "withdraw-success-taxed", Map.of(
+                    "amount", currency.format(amount),
+                    "tax",    currency.format(taxAmount)
+            ));
+        } else {
+            Lang.send(player, "withdraw-success",
+                    Map.of("amount", currency.format(amount)));
         }
 
         return true;
@@ -187,16 +186,13 @@ public class WithdrawCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command,
                                        String label, String[] args) {
-
         List<String> completions = new ArrayList<>();
-
         if (args.length == 2) {
             String partial = args[1].toLowerCase();
             CurrencyManager.getAllEnabled().keySet().stream()
                     .filter(id -> id.startsWith(partial))
                     .forEach(completions::add);
         }
-
         return completions;
     }
 }
