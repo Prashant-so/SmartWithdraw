@@ -90,7 +90,6 @@ public class BankMenuListener implements Listener {
 
     private void withdrawOne(Player player, Currency currency, int value) {
 
-        // World check
         if (!currency.isWorldAllowed(player.getWorld().getName())) {
             Lang.send(player, "world-not-allowed",
                     Map.of("currency", currency.name()));
@@ -106,7 +105,6 @@ public class BankMenuListener implements Listener {
             return;
         }
 
-        // Daily limit check
         if (currency.hasDailyLimit()) {
             boolean allowed = DailyLimitManager.tryWithdraw(
                     player.getUniqueId(), currency.id(),
@@ -122,12 +120,15 @@ public class BankMenuListener implements Listener {
             }
         }
 
-        TaxConfig tax      = currency.tax();
-        long taxAmount     = tax.applyOnWithdraw()
-                ? tax.calculateTax(value) : 0;
-        long totalDeduct   = value + taxAmount;
+        TaxConfig tax    = currency.tax();
+        long taxAmount   = tax.applyOnWithdraw() ? tax.calculateTax(value) : 0;
+        long totalDeduct = value + taxAmount;
 
         if (!provider.has(player, totalDeduct)) {
+            if (currency.hasDailyLimit()) {
+                DailyLimitManager.refund(
+                        player.getUniqueId(), currency.id(), value);
+            }
             Lang.send(player, "insufficient-funds");
             return;
         }
@@ -139,6 +140,10 @@ public class BankMenuListener implements Listener {
             long currentlyHeld = InventoryUtils.sumHeldNoteValue(
                     player, currency);
             if (currentlyHeld + value > maxHeld) {
+                if (currency.hasDailyLimit()) {
+                    DailyLimitManager.refund(
+                            player.getUniqueId(), currency.id(), value);
+                }
                 Lang.send(player, "held-limit-exceeded",
                         Map.of("limit", currency.format(maxHeld)));
                 return;
@@ -165,11 +170,11 @@ public class BankMenuListener implements Listener {
 
     private void depositAll(Player player) {
 
-        // Scan expiry first
         NoteExpiryListener.scanAndDestroy(player);
 
         Map<String, Long>     depositedByCurrency = new HashMap<>();
         Map<String, Currency> currencyById        = new HashMap<>();
+        // BUG FIX: collect then remove
         List<ItemStack>       toRemove            = new ArrayList<>();
 
         for (ItemStack item : player.getInventory().getContents()) {
