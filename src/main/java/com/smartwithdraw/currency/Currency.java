@@ -36,8 +36,7 @@ public record Currency(
 
     public boolean isWorldAllowed(String worldName) {
         if (allowedWorlds == null || allowedWorlds.isEmpty()) return true;
-        return allowedWorlds.stream()
-                .anyMatch(w -> w.equalsIgnoreCase(worldName));
+        return allowedWorlds.stream().anyMatch(w -> w.equalsIgnoreCase(worldName));
     }
 
     public boolean hasExpiry() {
