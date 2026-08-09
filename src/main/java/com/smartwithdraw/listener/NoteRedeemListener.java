@@ -30,9 +30,7 @@ public class NoteRedeemListener implements Listener {
             return;
         }
 
-        if (event.getHand() != EquipmentSlot.HAND) {
-            return;
-        }
+        if (event.getHand() != EquipmentSlot.HAND) return;
 
         if (event.getAction() != Action.RIGHT_CLICK_AIR
                 && event.getAction() != Action.RIGHT_CLICK_BLOCK) {
@@ -63,9 +61,7 @@ public class NoteRedeemListener implements Listener {
             return;
         }
 
-        if (!info.currency().enabled()) {
-            return;
-        }
+        if (!info.currency().enabled()) return;
 
         BalanceProvider provider =
                 BalanceProviderRegistry.get(info.currency().backend());
