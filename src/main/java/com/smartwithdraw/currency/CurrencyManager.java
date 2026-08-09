@@ -65,11 +65,10 @@ public final class CurrencyManager {
                 material = Material.PAPER;
             }
 
-            int expiryDays  = section.getInt("expiry-days", 0);
-            long dailyLimit = section.getLong("daily-limit", 0);
+            int expiryDays        = section.getInt("expiry-days", 0);
+            long dailyLimit       = section.getLong("daily-limit", 0);
             List<String> allowedWorlds = section.getStringList("allowed-worlds");
 
-            // Tax
             ConfigurationSection taxSection = section.getConfigurationSection("tax");
             TaxConfig tax = taxSection != null
                     ? new TaxConfig(
@@ -78,7 +77,6 @@ public final class CurrencyManager {
                             taxSection.getBoolean("apply-on-deposit", false))
                     : TaxConfig.NONE;
 
-            // Lore
             ConfigurationSection loreSection = section.getConfigurationSection("lore");
             List<String> template = loreSection != null
                     ? loreSection.getStringList("template")
