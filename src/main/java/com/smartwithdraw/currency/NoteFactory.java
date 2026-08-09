@@ -22,6 +22,7 @@ public final class NoteFactory {
     private static final DateTimeFormatter DATE_FORMAT =
             DateTimeFormatter.ofPattern("dd-MM-yyyy");
 
+    // Static keys — initialized once in init(), never recreated
     private static NamespacedKey markerKey;
     private static NamespacedKey valueKey;
     private static NamespacedKey currencyKey;
@@ -72,7 +73,6 @@ public final class NoteFactory {
                 .set(createdKey,   PersistentDataType.LONG,    now);
 
         note.setItemMeta(meta);
-
         return note;
     }
 
@@ -101,7 +101,6 @@ public final class NoteFactory {
         String typeLabel  = plugin.getConfig()
                 .getString("notes.type-label", "Satchel").toLowerCase();
 
-        // Build expiry string
         String expiryStr;
         if (currency.expiryDays() <= 0) {
             expiryStr = "Never";
@@ -142,7 +141,6 @@ public final class NoteFactory {
                     .replace("%tax%",      currency.tax().displayString())
                     .replace("%currency%", currency.name())
                     .replace("%type%",     typeLabel);
-
             lore.add(translate(processed));
         }
 
