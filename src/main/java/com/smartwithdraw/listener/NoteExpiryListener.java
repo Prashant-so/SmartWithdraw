@@ -16,11 +16,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * Handles two expiry detection paths:
- * 1. On player join — scans inventory immediately
- * 2. Periodic scan — scheduled in SmartWithdraw.java every N seconds
- */
 public class NoteExpiryListener implements Listener {
 
     @EventHandler
@@ -28,9 +23,6 @@ public class NoteExpiryListener implements Listener {
         scanAndDestroy(event.getPlayer());
     }
 
-    /**
-     * Called both from the join event and from the periodic scheduler.
-     */
     public static void scanAndDestroy(Player player) {
 
         List<ItemStack> toRemove = new ArrayList<>();
@@ -38,34 +30,22 @@ public class NoteExpiryListener implements Listener {
         for (ItemStack item : player.getInventory().getContents()) {
 
             Optional<NoteInfo> info = NoteValidator.getInfo(item);
-
-            if (info.isEmpty()) {
-                continue;
-            }
-
-            NoteInfo note = info.get();
-
-            if (!NoteValidator.isExpired(note)) {
-                continue;
-            }
+            if (info.isEmpty()) continue;
+            if (!NoteValidator.isExpired(info.get())) continue;
 
             toRemove.add(item);
         }
 
-        if (toRemove.isEmpty()) {
-            return;
-        }
+        if (toRemove.isEmpty()) return;
 
         for (ItemStack item : toRemove) {
-            player.getInventory().remove(item);
-            Optional<NoteInfo> info = NoteValidator.getInfo(item);
 
-            if (info.isEmpty()) {
-                continue;
-            }
+            Optional<NoteInfo> info = NoteValidator.getInfo(item);
+            player.getInventory().remove(item);
+
+            if (info.isEmpty()) continue;
 
             NoteInfo note = info.get();
-
             SoundUtil.play(player, "expire");
 
             Lang.send(player, "note-expired", Map.of(
