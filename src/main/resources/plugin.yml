@@ -1,5 +1,5 @@
 name: SmartWithdraw
-version: 2.0.0
+version: 3.0.0
 main: com.smartwithdraw.SmartWithdraw
 api-version: '1.21'
 
@@ -12,17 +12,17 @@ softdepend:
 
 commands:
   withdraw:
-    description: Withdraw money into notes
+    description: Withdraw balance as notes
     usage: /withdraw <amount> [currency]
     permission: smartwithdraw.withdraw
 
   deposit:
-    description: Deposit all notes
+    description: Deposit all notes in your inventory
     usage: /deposit
     permission: smartwithdraw.deposit
 
   smartwithdraw:
-    description: SmartWithdraw Help
+    description: SmartWithdraw main command
     usage: /smartwithdraw
     aliases:
       - sw
@@ -34,6 +34,8 @@ permissions:
     default: true
   smartwithdraw.gui:
     default: true
+  smartwithdraw.inspect:
+    default: op
   smartwithdraw.currency.coins:
     default: true
   smartwithdraw.currency.points:
