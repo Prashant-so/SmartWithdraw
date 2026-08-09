@@ -40,11 +40,6 @@ public final class DailyLimitManager {
         return minutes + "m";
     }
 
-    /**
-     * Attempts to record a withdrawal within the daily limit.
-     * Returns false if it would exceed the limit — caller must
-     * NOT proceed with the withdrawal in that case.
-     */
     public static boolean tryWithdraw(UUID uuid, String currencyId,
                                        long amount, long limit) {
         if (limit <= 0) return true;
@@ -58,6 +53,24 @@ public final class DailyLimitManager {
         WITHDRAWN.put(k, current + amount);
         WINDOW_START.putIfAbsent(k, System.currentTimeMillis());
         return true;
+    }
+
+    /**
+     * Refunds a previously recorded withdrawal — called when a
+     * balance check or inventory check fails AFTER the limit was
+     * already reserved, so the player's daily allowance isn't
+     * permanently consumed by a failed attempt.
+     */
+    public static void refund(UUID uuid, String currencyId, long amount) {
+        String k = key(uuid, currencyId);
+        long current = WITHDRAWN.getOrDefault(k, 0L);
+        long newAmount = Math.max(0, current - amount);
+        if (newAmount == 0) {
+            WITHDRAWN.remove(k);
+            WINDOW_START.remove(k);
+        } else {
+            WITHDRAWN.put(k, newAmount);
+        }
     }
 
     private static void purgeIfExpired(String k) {
