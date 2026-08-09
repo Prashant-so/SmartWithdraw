@@ -27,23 +27,18 @@ import java.util.Optional;
 public class DepositCommand implements CommandExecutor {
 
     @Override
-    public boolean onCommand(CommandSender sender,
-                              Command command,
-                              String label,
-                              String[] args) {
+    public boolean onCommand(CommandSender sender, Command command,
+                              String label, String[] args) {
 
-        if (!(sender instanceof Player player)) {
-            return true;
-        }
+        if (!(sender instanceof Player player)) return true;
+
+        // Scan and destroy expired notes first
+        NoteExpiryListener.scanAndDestroy(player);
 
         SmartWithdraw plugin = SmartWithdraw.getInstance();
 
-        // Scan for expired notes first
-        NoteExpiryListener.scanAndDestroy(player);
-
         int cooldownSeconds = plugin.getConfig()
                 .getInt("limits.deposit-cooldown-seconds", 0);
-
         long remaining = CooldownManager.remainingDepositSeconds(
                 player, cooldownSeconds);
 
@@ -53,25 +48,22 @@ public class DepositCommand implements CommandExecutor {
             return true;
         }
 
-        // World check uses default currency — player is depositing
-        // whatever they have, no currency arg needed
         Map<String, Long>     depositedByCurrency = new HashMap<>();
         Map<String, Currency> currencyById        = new HashMap<>();
-        List<ItemStack>       toRemove            = new ArrayList<>();
+
+        // BUG FIX: collect items first, remove after — prevents
+        // mid-iteration inventory mutation skipping adjacent slots
+        List<ItemStack> toRemove = new ArrayList<>();
 
         for (ItemStack item : player.getInventory().getContents()) {
 
             Optional<NoteInfo> info = NoteValidator.getInfo(item);
-
-            if (info.isEmpty()) {
-                continue;
-            }
+            if (info.isEmpty()) continue;
 
             NoteInfo note = info.get();
 
-            // World check per note's currency
-            if (!note.currency().isWorldAllowed(
-                    player.getWorld().getName())) {
+            // World check per currency
+            if (!note.currency().isWorldAllowed(player.getWorld().getName())) {
                 continue;
             }
 
@@ -89,7 +81,7 @@ public class DepositCommand implements CommandExecutor {
             return true;
         }
 
-        // Remove all at once — avoids mid-iteration inventory mutation bug
+        // Remove all at once
         for (ItemStack item : toRemove) {
             player.getInventory().remove(item);
         }
@@ -115,8 +107,7 @@ public class DepositCommand implements CommandExecutor {
 
             provider.deposit(player, creditAmount);
             CooldownManager.markDeposit(player);
-            TransactionLogger.log("DEPOSIT", player,
-                    currency.id(), creditAmount);
+            TransactionLogger.log("DEPOSIT", player, currency.id(), creditAmount);
             SoundUtil.play(player, "deposit");
 
             if (taxAmount > 0) {
