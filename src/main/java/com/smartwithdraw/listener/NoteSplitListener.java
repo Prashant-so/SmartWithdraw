@@ -38,7 +38,6 @@ public class NoteSplitListener implements Listener {
         }
 
         Player player = event.getPlayer();
-
         if (!player.isSneaking()) return;
 
         ItemStack item = player.getInventory().getItemInMainHand();
@@ -86,10 +85,8 @@ public class NoteSplitListener implements Listener {
         }
 
         SoundUtil.play(player, "split");
-
         Lang.send(player, "split-success",
                 Map.of("amount", currency.format(note.value())));
-
         event.setCancelled(true);
     }
 }
