@@ -1,7 +1,6 @@
 package com.smartwithdraw.currency;
 
 import com.smartwithdraw.SmartWithdraw;
-import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 
 import java.util.LinkedHashMap;
@@ -10,6 +9,20 @@ import java.util.Map;
 import java.util.Optional;
 
 public final class CurrencyManager {
+
+    // Skull textures hardcoded per currency id.
+    // To change the head for a currency, update the value here
+    // and rebuild — it is intentionally not configurable so server
+    // owners cannot accidentally break notes by entering wrong values.
+    private static final Map<String, String> SKULL_TEXTURES = Map.of(
+            "coins",  "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvODRiMzI3MTBjZWE1NjA4NTRlM2ZhYzE5MmYyMGE2MzNmNzI5YWZhMDJkZTRiMDc1ZmVmYjY4MGIzMDE2NThlMCJ9fX0=",
+            "points", "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvNjhiNDJmODZlZmE1ZjBmMzk2YTQwZDc3MzU0OTQxNDMzM2QxYzgwMjY5ZDA1ODBiYjg0YTY0YWI2Yjk2N2Q2ZSJ9fX0=",
+            "xp",     "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvNjUzZDc3NDI0Y2NiMTFmNzQyOTMyNDg3NzEzZTJlNDFiNDgxZjkxZWQxMTg3NGZkZmM1NzZlNDJkNTU5YTg2NiJ9fX0="
+    );
+
+    // Fallback texture used when currency id has no matching skull
+    private static final String FALLBACK_TEXTURE =
+            "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvZTNlNmMwNGU5NDM0ZjkwNzJhZjU3NDY0ODQ3MTNkZWRjMjdmOWZhNzA5MDc5ZjA5MjYxNzk4M2Y1NGQ0ZGJlZSJ9fX0=";
 
     private static final Map<String, Currency> CURRENCIES = new LinkedHashMap<>();
     private static String defaultCurrencyId = "coins";
@@ -55,18 +68,11 @@ public final class CurrencyManager {
                 backend = CurrencyBackend.VAULT;
             }
 
-            Material material;
-            try {
-                material = Material.valueOf(
-                        section.getString("material", "PAPER").toUpperCase());
-            } catch (IllegalArgumentException e) {
-                plugin.getLogger().warning(
-                        "Invalid material for '" + id + "', defaulting to PAPER.");
-                material = Material.PAPER;
-            }
+            String skullTexture = SKULL_TEXTURES.getOrDefault(
+                    id.toLowerCase(), FALLBACK_TEXTURE);
 
-            int expiryDays        = section.getInt("expiry-days", 0);
-            long dailyLimit       = section.getLong("daily-limit", 0);
+            int expiryDays             = section.getInt("expiry-days", 0);
+            long dailyLimit            = section.getLong("daily-limit", 0);
             List<String> allowedWorlds = section.getStringList("allowed-worlds");
 
             ConfigurationSection taxSection = section.getConfigurationSection("tax");
@@ -101,7 +107,7 @@ public final class CurrencyManager {
                     isDefault,
                     enabled,
                     backend,
-                    material,
+                    skullTexture,
                     expiryDays,
                     dailyLimit,
                     allowedWorlds,
@@ -135,7 +141,8 @@ public final class CurrencyManager {
         CURRENCIES.put("coins", new Currency(
                 "coins", "$", "Money", "Money", "%symbol%%amount%",
                 List.of(1, 10, 50, 100, 500, 2000), 1000, true, true,
-                CurrencyBackend.VAULT, Material.GOLD_NUGGET,
+                CurrencyBackend.VAULT,
+                SKULL_TEXTURES.get("coins"),
                 0, 0, List.of(), TaxConfig.NONE,
                 new LoreStyle("&e", true, "Common Tier", "money", List.of())
         ));
