@@ -51,7 +51,8 @@ public final class DenominationCalculator {
                 currency.id(), currency.symbol(), currency.name(),
                 currency.namePlural(), currency.format(), filtered,
                 currency.customModelDataBase(), currency.isDefault(),
-                currency.enabled(), currency.backend(), currency.material(),
+                currency.enabled(), currency.backend(),
+                currency.skullTexture(),
                 currency.expiryDays(), currency.dailyLimit(),
                 currency.allowedWorlds(), currency.tax(), currency.lore()
         );
