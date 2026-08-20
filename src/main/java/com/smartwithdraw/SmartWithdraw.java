@@ -76,8 +76,6 @@ public final class SmartWithdraw extends JavaPlugin {
                 .registerEvents(new BankMenuListener(), this);
         getServer().getPluginManager()
                 .registerEvents(new NoteExpiryListener(), this);
-        getServer().getPluginManager()
-                .registerEvents(new ResourcePackListener(), this);
 
         // Deliver pending notes on join
         getServer().getPluginManager().registerEvents(new Listener() {
