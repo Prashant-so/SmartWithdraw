@@ -23,7 +23,6 @@ currencies:
     denominations: [1, 10, 50, 100, 500, 2000]
     model-data-base: 1000
     backend: VAULT
-    material: GOLD_NUGGET
     expiry-days: 0
     daily-limit: 0
     allowed-worlds: []
@@ -60,7 +59,6 @@ currencies:
     denominations: [1, 10, 50, 100]
     model-data-base: 9000
     backend: PLAYERPOINTS
-    material: NETHER_STAR
     expiry-days: 0
     daily-limit: 0
     allowed-worlds: []
@@ -97,7 +95,6 @@ currencies:
     denominations: [1, 10, 30, 100]
     model-data-base: 9500
     backend: XP
-    material: EXPERIENCE_BOTTLE
     expiry-days: 0
     daily-limit: 0
     allowed-worlds: []
