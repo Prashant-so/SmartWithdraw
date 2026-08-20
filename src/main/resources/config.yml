@@ -7,7 +7,6 @@ branding:
 
 # ── CURRENCIES ───────────────────────────────────────────────────────
 # backend: VAULT | PLAYERPOINTS | XP
-# material: any valid Bukkit Material name
 # expiry-days: 0 = never expires
 # daily-limit: 0 = unlimited per 24hr rolling window
 # allowed-worlds: [] = all worlds allowed
@@ -155,15 +154,11 @@ logging:
   file: "transactions.log"
 
 # ── SECURITY ─────────────────────────────────────────────────────────
+# Auto-generated on first start. Used to sign every note cryptographically.
+# ⚠ WARNING: Never edit or delete this value — all existing notes will
+# become invalid and undepositable if you do.
 security:
   secret: ""
-
-# ── RESOURCE PACK ────────────────────────────────────────────────────
-resource-pack:
-  enabled: false
-  force: false
-  url: ""
-  sha1: ""
 
 # ── MESSAGES ─────────────────────────────────────────────────────────
 messages:
