@@ -1,7 +1,5 @@
 package com.smartwithdraw.currency;
 
-import org.bukkit.Material;
-
 import java.util.List;
 
 public record Currency(
@@ -15,7 +13,7 @@ public record Currency(
         boolean isDefault,
         boolean enabled,
         CurrencyBackend backend,
-        Material material,
+        String skullTexture,
         int expiryDays,
         long dailyLimit,
         List<String> allowedWorlds,
