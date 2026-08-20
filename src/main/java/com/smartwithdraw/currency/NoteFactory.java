@@ -5,24 +5,32 @@ import com.smartwithdraw.security.NoteKeys;
 import com.smartwithdraw.security.NoteInfo;
 import com.smartwithdraw.security.NoteValidator;
 import org.bukkit.ChatColor;
+import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.profile.PlayerProfile;
+import org.bukkit.profile.PlayerTextures;
 
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
+import java.util.UUID;
 
 public final class NoteFactory {
 
     private static final DateTimeFormatter DATE_FORMAT =
             DateTimeFormatter.ofPattern("dd-MM-yyyy");
 
-    // Static keys — initialized once in init(), never recreated
     private static NamespacedKey markerKey;
     private static NamespacedKey valueKey;
     private static NamespacedKey currencyKey;
@@ -43,12 +51,14 @@ public final class NoteFactory {
 
     public static ItemStack createNote(Currency currency, int value) {
 
-        ItemStack note = new ItemStack(currency.material());
-        ItemMeta  meta = note.getItemMeta();
+        ItemStack note = new ItemStack(Material.PLAYER_HEAD);
+        SkullMeta meta = (SkullMeta) note.getItemMeta();
 
         if (meta == null) return note;
 
         long now = System.currentTimeMillis();
+
+        applyTexture(meta, currency.skullTexture());
 
         meta.setDisplayName(buildTitle(currency));
         meta.setCustomModelData(currency.customModelDataBase() + value);
@@ -74,6 +84,47 @@ public final class NoteFactory {
 
         note.setItemMeta(meta);
         return note;
+    }
+
+    /**
+     * Applies a Base64 skull texture to a SkullMeta using the
+     * modern Paper/Spigot PlayerProfile API (1.19+).
+     * No NMS, no reflection — clean and future-proof.
+     */
+    private static void applyTexture(SkullMeta meta, String textureValue) {
+
+        if (textureValue == null || textureValue.isBlank()) return;
+
+        try {
+            String decoded = new String(
+                    Base64.getDecoder().decode(textureValue),
+                    StandardCharsets.UTF_8);
+
+            int urlStart = decoded.indexOf("\"url\":\"") + 7;
+            int urlEnd   = decoded.indexOf("\"", urlStart);
+
+            if (urlStart < 7 || urlEnd < 0) return;
+
+            String skinUrl = decoded.substring(urlStart, urlEnd);
+
+            // Deterministic UUID from texture value so identical
+            // textures always produce the same UUID — notes stack correctly
+            UUID uuid = UUID.nameUUIDFromBytes(
+                    textureValue.getBytes(StandardCharsets.UTF_8));
+
+            PlayerProfile profile = SmartWithdraw.getInstance()
+                    .getServer().createPlayerProfile(uuid, "SmartWithdraw");
+
+            PlayerTextures textures = profile.getTextures();
+            textures.setSkin(new URL(skinUrl));
+            profile.setTextures(textures);
+
+            meta.setOwnerProfile(profile);
+
+        } catch (MalformedURLException | IllegalArgumentException e) {
+            SmartWithdraw.getInstance().getLogger()
+                    .warning("Failed to apply skull texture: " + e.getMessage());
+        }
     }
 
     private static String buildTitle(Currency currency) {
