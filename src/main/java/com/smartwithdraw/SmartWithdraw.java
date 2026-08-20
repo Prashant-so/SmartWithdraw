@@ -10,7 +10,6 @@ import com.smartwithdraw.listener.BankMenuListener;
 import com.smartwithdraw.listener.NoteExpiryListener;
 import com.smartwithdraw.listener.NoteRedeemListener;
 import com.smartwithdraw.listener.NoteSplitListener;
-import com.smartwithdraw.listener.ResourcePackListener;
 import com.smartwithdraw.placeholder.SmartWithdrawExpansion;
 import com.smartwithdraw.security.NoteValidator;
 import com.smartwithdraw.security.SecretKeyManager;
