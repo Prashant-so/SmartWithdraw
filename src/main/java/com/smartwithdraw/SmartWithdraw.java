@@ -10,15 +10,19 @@ import com.smartwithdraw.listener.BankMenuListener;
 import com.smartwithdraw.listener.NoteExpiryListener;
 import com.smartwithdraw.listener.NoteRedeemListener;
 import com.smartwithdraw.listener.NoteSplitListener;
+import com.smartwithdraw.logging.TransactionLogger;
 import com.smartwithdraw.placeholder.SmartWithdrawExpansion;
 import com.smartwithdraw.security.NoteValidator;
 import com.smartwithdraw.security.SecretKeyManager;
 import com.smartwithdraw.storage.PendingNoteStorage;
+import com.smartwithdraw.util.CooldownManager;
+import com.smartwithdraw.util.DailyLimitManager;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class SmartWithdraw extends JavaPlugin {
@@ -42,14 +46,14 @@ public final class SmartWithdraw extends JavaPlugin {
         SecretKeyManager.load();
         CurrencyManager.load();
 
-        // Init static NamespacedKeys once — avoids creating them
-        // on every note creation/validation call
         NoteValidator.init();
         NoteFactory.init();
 
         PendingNoteStorage.init();
+        CooldownManager.init();
+        DailyLimitManager.init();
+        TransactionLogger.init();
 
-        // Commands + tab completers
         if (getCommand("withdraw") != null) {
             WithdrawCommand wc = new WithdrawCommand();
             getCommand("withdraw").setExecutor(wc);
@@ -66,7 +70,6 @@ public final class SmartWithdraw extends JavaPlugin {
             getCommand("smartwithdraw").setTabCompleter(sc);
         }
 
-        // Listeners
         getServer().getPluginManager()
                 .registerEvents(new NoteRedeemListener(), this);
         getServer().getPluginManager()
@@ -76,15 +79,24 @@ public final class SmartWithdraw extends JavaPlugin {
         getServer().getPluginManager()
                 .registerEvents(new NoteExpiryListener(), this);
 
-        // Deliver pending notes on join
         getServer().getPluginManager().registerEvents(new Listener() {
+
             @EventHandler
             public void onJoin(PlayerJoinEvent event) {
                 PendingNoteStorage.deliverPending(event.getPlayer());
             }
+
+            @EventHandler
+            public void onQuit(PlayerQuitEvent event) {
+                // Save this player's cooldown timestamps immediately
+                // on logout so a crash between quit and next autosave
+                // doesn't lose their cooldown state
+                CooldownManager.save();
+                DailyLimitManager.save();
+            }
+
         }, this);
 
-        // Periodic expiry scan
         int scanInterval = getConfig()
                 .getInt("expiry.scan-interval-seconds", 30);
 
@@ -97,7 +109,6 @@ public final class SmartWithdraw extends JavaPlugin {
             }, ticks, ticks);
         }
 
-        // Soft dependency hooks
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
             new SmartWithdrawExpansion().register();
             getLogger().info("Hooked into PlaceholderAPI.");
@@ -107,11 +118,14 @@ public final class SmartWithdraw extends JavaPlugin {
             getLogger().info("Hooked into PlayerPoints.");
         }
 
-        getLogger().info("SmartWithdraw 2.0 enabled successfully.");
+        getLogger().info("SmartWithdraw enabled successfully.");
     }
 
     @Override
     public void onDisable() {
+        CooldownManager.save();
+        DailyLimitManager.save();
+        TransactionLogger.close();
         getLogger().info("SmartWithdraw disabled.");
     }
 
