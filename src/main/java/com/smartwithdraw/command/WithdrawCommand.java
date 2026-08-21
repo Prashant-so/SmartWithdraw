@@ -19,6 +19,7 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -57,8 +58,7 @@ public class WithdrawCommand implements CommandExecutor, TabCompleter {
         }
 
         if (!currency.isWorldAllowed(player.getWorld().getName())) {
-            Lang.send(player, "world-not-allowed",
-                    Map.of("currency", currency.name()));
+            Lang.send(player, "world-not-allowed", Map.of("currency", currency.name()));
             return true;
         }
 
@@ -70,19 +70,16 @@ public class WithdrawCommand implements CommandExecutor, TabCompleter {
         BalanceProvider provider = BalanceProviderRegistry.get(currency.backend());
 
         if (provider == null || !provider.isAvailable()) {
-            Lang.send(player, "backend-unavailable",
-                    Map.of("currency", currency.id()));
+            Lang.send(player, "backend-unavailable", Map.of("currency", currency.id()));
             return true;
         }
 
         int cooldownSeconds = plugin.getConfig()
                 .getInt("limits.withdraw-cooldown-seconds", 0);
-        long remaining = CooldownManager.remainingWithdrawSeconds(
-                player, cooldownSeconds);
+        long remaining = CooldownManager.remainingWithdrawSeconds(player, cooldownSeconds);
 
         if (remaining > 0) {
-            Lang.send(player, "on-cooldown",
-                    Map.of("seconds", String.valueOf(remaining)));
+            Lang.send(player, "on-cooldown", Map.of("seconds", String.valueOf(remaining)));
             return true;
         }
 
@@ -99,10 +96,18 @@ public class WithdrawCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        TaxConfig tax    = currency.tax();
+        long taxAmount   = tax.applyOnWithdraw() ? tax.calculateTax(amount) : 0;
+        long totalDeduct = amount + taxAmount;
+
+        if (!provider.has(player, totalDeduct)) {
+            Lang.send(player, "insufficient-funds");
+            return true;
+        }
+
         if (currency.hasDailyLimit()) {
             boolean allowed = DailyLimitManager.tryWithdraw(
-                    player.getUniqueId(), currency.id(),
-                    amount, currency.dailyLimit());
+                    player.getUniqueId(), currency.id(), amount, currency.dailyLimit());
             if (!allowed) {
                 Lang.send(player, "daily-limit-reached", Map.of(
                         "limit",    currency.format(currency.dailyLimit()),
@@ -114,26 +119,12 @@ public class WithdrawCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        TaxConfig tax    = currency.tax();
-        long taxAmount   = tax.applyOnWithdraw() ? tax.calculateTax(amount) : 0;
-        long totalDeduct = amount + taxAmount;
-
-        if (!provider.has(player, totalDeduct)) {
-            if (currency.hasDailyLimit()) {
-                DailyLimitManager.refund(
-                        player.getUniqueId(), currency.id(), amount);
-            }
-            Lang.send(player, "insufficient-funds");
-            return true;
-        }
-
         long maxHeld = plugin.getConfig().getLong("limits.max-held-value", 0);
         if (maxHeld > 0) {
             long currentlyHeld = InventoryUtils.sumHeldNoteValue(player, currency);
             if (currentlyHeld + amount > maxHeld) {
                 if (currency.hasDailyLimit()) {
-                    DailyLimitManager.refund(
-                            player.getUniqueId(), currency.id(), amount);
+                    DailyLimitManager.refund(player.getUniqueId(), currency.id(), amount);
                 }
                 Lang.send(player, "held-limit-exceeded",
                         Map.of("limit", currency.format(maxHeld)));
@@ -141,22 +132,52 @@ public class WithdrawCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        provider.withdraw(player, totalDeduct);
-
-        boolean autoSplit = plugin.getConfig()
-                .getBoolean("notes.auto-split-notes", false);
+        boolean autoSplit = plugin.getConfig().getBoolean("notes.auto-split-notes", false);
+        List<ItemStack> notesToGive = new ArrayList<>();
 
         if (autoSplit) {
-            Map<Integer, Integer> notes =
-                    DenominationCalculator.calculate(amount, currency);
-            for (Map.Entry<Integer, Integer> entry : notes.entrySet()) {
+            for (Map.Entry<Integer, Integer> entry :
+                    DenominationCalculator.calculate(amount, currency).entrySet()) {
                 for (int i = 0; i < entry.getValue(); i++) {
-                    InventoryUtils.give(player,
-                            NoteFactory.createNote(currency, entry.getKey()));
+                    ItemStack note = NoteFactory.createNote(currency, entry.getKey());
+                    if (note == null) {
+                        if (currency.hasDailyLimit()) {
+                            DailyLimitManager.refund(
+                                    player.getUniqueId(), currency.id(), amount);
+                        }
+                        player.sendMessage(
+                                "§c§l✖ §cNote creation failed — transaction aborted. "
+                                + "Contact an admin.");
+                        return true;
+                    }
+                    notesToGive.add(note);
                 }
             }
         } else {
-            InventoryUtils.give(player, NoteFactory.createNote(currency, amount));
+            ItemStack note = NoteFactory.createNote(currency, amount);
+            if (note == null) {
+                if (currency.hasDailyLimit()) {
+                    DailyLimitManager.refund(player.getUniqueId(), currency.id(), amount);
+                }
+                player.sendMessage(
+                        "§c§l✖ §cNote creation failed — transaction aborted. "
+                        + "Contact an admin.");
+                return true;
+            }
+            notesToGive.add(note);
+        }
+
+        boolean withdrawn = provider.withdraw(player, totalDeduct);
+        if (!withdrawn) {
+            if (currency.hasDailyLimit()) {
+                DailyLimitManager.refund(player.getUniqueId(), currency.id(), amount);
+            }
+            Lang.send(player, "insufficient-funds");
+            return true;
+        }
+
+        for (ItemStack note : notesToGive) {
+            InventoryUtils.give(player, note);
         }
 
         CooldownManager.markWithdraw(player);
@@ -164,8 +185,7 @@ public class WithdrawCommand implements CommandExecutor, TabCompleter {
         SoundUtil.play(player, "withdraw");
 
         if (taxAmount > 0) {
-            TransactionLogger.log("TAX_WITHDRAW", player,
-                    currency.id(), taxAmount);
+            TransactionLogger.log("TAX_WITHDRAW", player, currency.id(), taxAmount);
             Lang.send(player, "withdraw-success-taxed", Map.of(
                     "amount", currency.format(amount),
                     "tax",    currency.format(taxAmount)
