@@ -17,10 +17,16 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 public class NoteSplitListener implements Listener {
+
+    private final Map<UUID, Long> lastProcessedTick = new HashMap<>();
 
     @EventHandler
     public void onSplit(PlayerInteractEvent event) {
@@ -40,6 +46,14 @@ public class NoteSplitListener implements Listener {
         Player player = event.getPlayer();
         if (!player.isSneaking()) return;
 
+        long currentTick = SmartWithdraw.getInstance().getServer().getCurrentTick();
+        Long lastTick = lastProcessedTick.get(player.getUniqueId());
+        if (lastTick != null && lastTick == currentTick) {
+            event.setCancelled(true);
+            return;
+        }
+        lastProcessedTick.put(player.getUniqueId(), currentTick);
+
         ItemStack item = player.getInventory().getItemInMainHand();
 
         Optional<NoteInfo> info = NoteValidator.getInfo(item);
@@ -48,14 +62,12 @@ public class NoteSplitListener implements Listener {
         NoteInfo  note     = info.get();
         Currency  currency = note.currency();
 
-        // Expiry check
         if (NoteValidator.isExpired(note)) {
             NoteExpiryListener.scanAndDestroy(player);
             event.setCancelled(true);
             return;
         }
 
-        // World check
         if (!currency.isWorldAllowed(player.getWorld().getName())) {
             Lang.send(player, "world-not-allowed",
                     Map.of("currency", currency.name()));
@@ -71,17 +83,27 @@ public class NoteSplitListener implements Listener {
             return;
         }
 
+        List<ItemStack> newNotes = new ArrayList<>();
+        for (Map.Entry<Integer, Integer> entry : breakdown.entrySet()) {
+            for (int i = 0; i < entry.getValue(); i++) {
+                ItemStack newNote = NoteFactory.createNote(currency, entry.getKey());
+                if (newNote == null) {
+                    Lang.send(player, "cannot-split");
+                    event.setCancelled(true);
+                    return;
+                }
+                newNotes.add(newNote);
+            }
+        }
+
         if (item.getAmount() > 1) {
             item.setAmount(item.getAmount() - 1);
         } else {
             player.getInventory().setItemInMainHand(null);
         }
 
-        for (Map.Entry<Integer, Integer> entry : breakdown.entrySet()) {
-            for (int i = 0; i < entry.getValue(); i++) {
-                InventoryUtils.give(player,
-                        NoteFactory.createNote(currency, entry.getKey()));
-            }
+        for (ItemStack newNote : newNotes) {
+            InventoryUtils.give(player, newNote);
         }
 
         SoundUtil.play(player, "split");
