@@ -12,6 +12,7 @@ import com.smartwithdraw.gui.BankMenuHolder;
 import com.smartwithdraw.logging.TransactionLogger;
 import com.smartwithdraw.security.NoteInfo;
 import com.smartwithdraw.security.NoteValidator;
+import com.smartwithdraw.util.CooldownManager;
 import com.smartwithdraw.util.DailyLimitManager;
 import com.smartwithdraw.util.InventoryUtils;
 import com.smartwithdraw.util.Lang;
@@ -73,8 +74,7 @@ public class BankMenuListener implements Listener {
         }
 
         if (action.startsWith(BankMenu.SWITCH_CURRENCY_ACTION_PREFIX)) {
-            String id = action.substring(
-                    BankMenu.SWITCH_CURRENCY_ACTION_PREFIX.length());
+            String id = action.substring(BankMenu.SWITCH_CURRENCY_ACTION_PREFIX.length());
             CurrencyManager.get(id).ifPresentOrElse(
                     c -> BankMenu.open(player, c),
                     () -> BankMenu.open(player));
@@ -96,12 +96,21 @@ public class BankMenuListener implements Listener {
             return;
         }
 
-        BalanceProvider provider =
-                BalanceProviderRegistry.get(currency.backend());
+        BalanceProvider provider = BalanceProviderRegistry.get(currency.backend());
 
         if (provider == null || !provider.isAvailable()) {
             Lang.send(player, "backend-unavailable",
                     Map.of("currency", currency.id()));
+            return;
+        }
+
+        int cooldownSeconds = SmartWithdraw.getInstance().getConfig()
+                .getInt("limits.withdraw-cooldown-seconds", 0);
+        long remaining = CooldownManager.remainingWithdrawSeconds(player, cooldownSeconds);
+
+        if (remaining > 0) {
+            Lang.send(player, "on-cooldown",
+                    Map.of("seconds", String.valueOf(remaining)));
             return;
         }
 
@@ -126,8 +135,7 @@ public class BankMenuListener implements Listener {
 
         if (!provider.has(player, totalDeduct)) {
             if (currency.hasDailyLimit()) {
-                DailyLimitManager.refund(
-                        player.getUniqueId(), currency.id(), value);
+                DailyLimitManager.refund(player.getUniqueId(), currency.id(), value);
             }
             Lang.send(player, "insufficient-funds");
             return;
@@ -137,12 +145,10 @@ public class BankMenuListener implements Listener {
                 .getLong("limits.max-held-value", 0);
 
         if (maxHeld > 0) {
-            long currentlyHeld = InventoryUtils.sumHeldNoteValue(
-                    player, currency);
+            long currentlyHeld = InventoryUtils.sumHeldNoteValue(player, currency);
             if (currentlyHeld + value > maxHeld) {
                 if (currency.hasDailyLimit()) {
-                    DailyLimitManager.refund(
-                            player.getUniqueId(), currency.id(), value);
+                    DailyLimitManager.refund(player.getUniqueId(), currency.id(), value);
                 }
                 Lang.send(player, "held-limit-exceeded",
                         Map.of("limit", currency.format(maxHeld)));
@@ -150,14 +156,31 @@ public class BankMenuListener implements Listener {
             }
         }
 
-        provider.withdraw(player, totalDeduct);
-        InventoryUtils.give(player, NoteFactory.createNote(currency, value));
+        ItemStack note = NoteFactory.createNote(currency, value);
+        if (note == null) {
+            if (currency.hasDailyLimit()) {
+                DailyLimitManager.refund(player.getUniqueId(), currency.id(), value);
+            }
+            player.sendMessage("§c§l✖ §cNote creation failed — transaction aborted.");
+            return;
+        }
+
+        boolean withdrawn = provider.withdraw(player, totalDeduct);
+        if (!withdrawn) {
+            if (currency.hasDailyLimit()) {
+                DailyLimitManager.refund(player.getUniqueId(), currency.id(), value);
+            }
+            Lang.send(player, "insufficient-funds");
+            return;
+        }
+
+        InventoryUtils.give(player, note);
+        CooldownManager.markWithdraw(player);
         TransactionLogger.log("WITHDRAW", player, currency.id(), value);
         SoundUtil.play(player, "withdraw");
 
         if (taxAmount > 0) {
-            TransactionLogger.log("TAX_WITHDRAW", player,
-                    currency.id(), taxAmount);
+            TransactionLogger.log("TAX_WITHDRAW", player, currency.id(), taxAmount);
             Lang.send(player, "withdraw-success-taxed", Map.of(
                     "amount", currency.format(value),
                     "tax",    currency.format(taxAmount)
@@ -174,7 +197,6 @@ public class BankMenuListener implements Listener {
 
         Map<String, Long>     depositedByCurrency = new HashMap<>();
         Map<String, Currency> currencyById        = new HashMap<>();
-        // BUG FIX: collect then remove
         List<ItemStack>       toRemove            = new ArrayList<>();
 
         for (ItemStack item : player.getInventory().getContents()) {
@@ -184,10 +206,7 @@ public class BankMenuListener implements Listener {
 
             NoteInfo note = info.get();
 
-            if (!note.currency().isWorldAllowed(
-                    player.getWorld().getName())) {
-                continue;
-            }
+            if (!note.currency().isWorldAllowed(player.getWorld().getName())) continue;
 
             depositedByCurrency.merge(
                     note.currency().id(),
@@ -203,9 +222,7 @@ public class BankMenuListener implements Listener {
             return;
         }
 
-        for (ItemStack item : toRemove) {
-            player.getInventory().remove(item);
-        }
+        List<String> successfullyCredited = new ArrayList<>();
 
         for (Map.Entry<String, Long> entry : depositedByCurrency.entrySet()) {
 
@@ -224,16 +241,22 @@ public class BankMenuListener implements Listener {
             TaxConfig tax     = currency.tax();
             long taxAmount    = tax.applyOnDeposit()
                     ? tax.calculateTax(rawAmount) : 0;
-            long creditAmount = rawAmount - taxAmount;
+            long creditAmount = Math.max(0, rawAmount - taxAmount);
 
-            provider.deposit(player, creditAmount);
-            TransactionLogger.log("DEPOSIT", player,
-                    currency.id(), creditAmount);
+            boolean deposited = provider.deposit(player, creditAmount);
+
+            if (!deposited) {
+                Lang.send(player, "backend-unavailable",
+                        Map.of("currency", currency.id()));
+                continue;
+            }
+
+            successfullyCredited.add(currency.id());
+            TransactionLogger.log("DEPOSIT", player, currency.id(), creditAmount);
             SoundUtil.play(player, "deposit");
 
             if (taxAmount > 0) {
-                TransactionLogger.log("TAX_DEPOSIT", player,
-                        currency.id(), taxAmount);
+                TransactionLogger.log("TAX_DEPOSIT", player, currency.id(), taxAmount);
                 Lang.send(player, "deposit-success-taxed", Map.of(
                         "amount", currency.format(creditAmount),
                         "tax",    currency.format(taxAmount)
@@ -241,6 +264,14 @@ public class BankMenuListener implements Listener {
             } else {
                 Lang.send(player, "deposit-success",
                         Map.of("amount", currency.format(creditAmount)));
+            }
+        }
+
+        for (ItemStack item : toRemove) {
+            Optional<NoteInfo> info = NoteValidator.getInfo(item);
+            if (info.isEmpty()) continue;
+            if (successfullyCredited.contains(info.get().currency().id())) {
+                player.getInventory().remove(item);
             }
         }
     }
