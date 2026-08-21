@@ -32,28 +32,22 @@ public class DepositCommand implements CommandExecutor {
 
         if (!(sender instanceof Player player)) return true;
 
-        // Scan and destroy expired notes first
         NoteExpiryListener.scanAndDestroy(player);
 
         SmartWithdraw plugin = SmartWithdraw.getInstance();
 
         int cooldownSeconds = plugin.getConfig()
                 .getInt("limits.deposit-cooldown-seconds", 0);
-        long remaining = CooldownManager.remainingDepositSeconds(
-                player, cooldownSeconds);
+        long remaining = CooldownManager.remainingDepositSeconds(player, cooldownSeconds);
 
         if (remaining > 0) {
-            Lang.send(player, "on-cooldown",
-                    Map.of("seconds", String.valueOf(remaining)));
+            Lang.send(player, "on-cooldown", Map.of("seconds", String.valueOf(remaining)));
             return true;
         }
 
         Map<String, Long>     depositedByCurrency = new HashMap<>();
         Map<String, Currency> currencyById        = new HashMap<>();
-
-        // BUG FIX: collect items first, remove after — prevents
-        // mid-iteration inventory mutation skipping adjacent slots
-        List<ItemStack> toRemove = new ArrayList<>();
+        List<ItemStack>       toRemove            = new ArrayList<>();
 
         for (ItemStack item : player.getInventory().getContents()) {
 
@@ -62,10 +56,7 @@ public class DepositCommand implements CommandExecutor {
 
             NoteInfo note = info.get();
 
-            // World check per currency
-            if (!note.currency().isWorldAllowed(player.getWorld().getName())) {
-                continue;
-            }
+            if (!note.currency().isWorldAllowed(player.getWorld().getName())) continue;
 
             depositedByCurrency.merge(
                     note.currency().id(),
@@ -81,10 +72,7 @@ public class DepositCommand implements CommandExecutor {
             return true;
         }
 
-        // Remove all at once
-        for (ItemStack item : toRemove) {
-            player.getInventory().remove(item);
-        }
+        List<String> successfullyCredited = new ArrayList<>();
 
         for (Map.Entry<String, Long> entry : depositedByCurrency.entrySet()) {
 
@@ -103,16 +91,23 @@ public class DepositCommand implements CommandExecutor {
             TaxConfig tax     = currency.tax();
             long taxAmount    = tax.applyOnDeposit()
                     ? tax.calculateTax(rawAmount) : 0;
-            long creditAmount = rawAmount - taxAmount;
+            long creditAmount = Math.max(0, rawAmount - taxAmount);
 
-            provider.deposit(player, creditAmount);
+            boolean deposited = provider.deposit(player, creditAmount);
+
+            if (!deposited) {
+                Lang.send(player, "backend-unavailable",
+                        Map.of("currency", currency.id()));
+                continue;
+            }
+
+            successfullyCredited.add(currency.id());
             CooldownManager.markDeposit(player);
             TransactionLogger.log("DEPOSIT", player, currency.id(), creditAmount);
             SoundUtil.play(player, "deposit");
 
             if (taxAmount > 0) {
-                TransactionLogger.log("TAX_DEPOSIT", player,
-                        currency.id(), taxAmount);
+                TransactionLogger.log("TAX_DEPOSIT", player, currency.id(), taxAmount);
                 Lang.send(player, "deposit-success-taxed", Map.of(
                         "amount", currency.format(creditAmount),
                         "tax",    currency.format(taxAmount)
@@ -120,6 +115,14 @@ public class DepositCommand implements CommandExecutor {
             } else {
                 Lang.send(player, "deposit-success",
                         Map.of("amount", currency.format(creditAmount)));
+            }
+        }
+
+        for (ItemStack item : toRemove) {
+            Optional<NoteInfo> info = NoteValidator.getInfo(item);
+            if (info.isEmpty()) continue;
+            if (successfullyCredited.contains(info.get().currency().id())) {
+                player.getInventory().remove(item);
             }
         }
 
