@@ -8,9 +8,9 @@ public interface BalanceProvider {
 
     boolean has(Player player, long amount);
 
-    void withdraw(Player player, long amount);
+    boolean withdraw(Player player, long amount);
 
-    void deposit(Player player, long amount);
+    boolean deposit(Player player, long amount);
 
     long getBalance(Player player);
 }
