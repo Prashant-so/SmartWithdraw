@@ -16,15 +16,18 @@ public class XpBalanceProvider implements BalanceProvider {
     }
 
     @Override
-    public void withdraw(Player player, long amount) {
+    public boolean withdraw(Player player, long amount) {
         long current = ExperienceUtils.getTotalExperience(player);
-        ExperienceUtils.setTotalExperience(player, Math.max(0, current - amount));
+        if (current < amount) return false;
+        ExperienceUtils.setTotalExperience(player, current - amount);
+        return true;
     }
 
     @Override
-    public void deposit(Player player, long amount) {
+    public boolean deposit(Player player, long amount) {
         long current = ExperienceUtils.getTotalExperience(player);
         ExperienceUtils.setTotalExperience(player, current + amount);
+        return true;
     }
 
     @Override
