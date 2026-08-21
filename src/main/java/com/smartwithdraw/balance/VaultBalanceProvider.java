@@ -16,17 +16,15 @@ public class VaultBalanceProvider implements BalanceProvider {
     }
 
     @Override
-    public void withdraw(Player player, long amount) {
-        if (isAvailable()) {
-            EconomyManager.withdraw(player, amount);
-        }
+    public boolean withdraw(Player player, long amount) {
+        if (!isAvailable()) return false;
+        return EconomyManager.withdraw(player, amount);
     }
 
     @Override
-    public void deposit(Player player, long amount) {
-        if (isAvailable()) {
-            EconomyManager.deposit(player, amount);
-        }
+    public boolean deposit(Player player, long amount) {
+        if (!isAvailable()) return false;
+        return EconomyManager.deposit(player, amount);
     }
 
     @Override
