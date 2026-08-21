@@ -10,7 +10,6 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.profile.PlayerProfile;
@@ -37,6 +36,8 @@ public final class NoteFactory {
     private static NamespacedKey signatureKey;
     private static NamespacedKey createdKey;
 
+    private static Boolean paperApiAvailable = null;
+
     private NoteFactory() {
     }
 
@@ -47,50 +48,72 @@ public final class NoteFactory {
         currencyKey  = new NamespacedKey(plugin, NoteKeys.NOTE_CURRENCY);
         signatureKey = new NamespacedKey(plugin, NoteKeys.NOTE_SIGNATURE);
         createdKey   = new NamespacedKey(plugin, NoteKeys.NOTE_CREATED);
+        detectPaperApi();
+    }
+
+    private static void detectPaperApi() {
+        try {
+            SmartWithdraw.getInstance().getServer()
+                    .createPlayerProfile(UUID.randomUUID(), "probe");
+            paperApiAvailable = true;
+            SmartWithdraw.getInstance().getLogger()
+                    .info("Custom skull textures enabled.");
+        } catch (Throwable t) {
+            paperApiAvailable = false;
+            SmartWithdraw.getInstance().getLogger()
+                    .warning("Custom skull textures unavailable on this server type. "
+                            + "Run Paper to enable them.");
+        }
     }
 
     public static ItemStack createNote(Currency currency, int value) {
 
-        ItemStack note = new ItemStack(Material.PLAYER_HEAD);
-        SkullMeta meta = (SkullMeta) note.getItemMeta();
+        try {
+            ItemStack note = new ItemStack(Material.PLAYER_HEAD);
+            SkullMeta meta = (SkullMeta) note.getItemMeta();
 
-        if (meta == null) return note;
+            if (meta == null) return null;
 
-        long now = System.currentTimeMillis();
+            long now = System.currentTimeMillis();
 
-        applyTexture(meta, currency.skullTexture());
+            if (Boolean.TRUE.equals(paperApiAvailable)) {
+                applyTexture(meta, currency.skullTexture());
+            }
 
-        meta.setDisplayName(buildTitle(currency));
-        meta.setCustomModelData(currency.customModelDataBase() + value);
-        meta.setLore(buildLore(currency, value, now));
+            meta.setDisplayName(buildTitle(currency));
+            meta.setCustomModelData(currency.customModelDataBase() + value);
+            meta.setLore(buildLore(currency, value, now));
 
-        if (SmartWithdraw.getInstance().getConfig()
-                .getBoolean("notes.glow-effect", false)) {
-            meta.addEnchant(Enchantment.LUCK_OF_THE_SEA, 1, true);
-            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+            if (SmartWithdraw.getInstance().getConfig()
+                    .getBoolean("notes.glow-effect", false)) {
+                meta.addEnchant(Enchantment.LUCK_OF_THE_SEA, 1, true);
+                meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+            }
+
+            meta.getPersistentDataContainer()
+                    .set(valueKey,     PersistentDataType.INTEGER, value);
+            meta.getPersistentDataContainer()
+                    .set(markerKey,    PersistentDataType.BYTE,    (byte) 1);
+            meta.getPersistentDataContainer()
+                    .set(currencyKey,  PersistentDataType.STRING,  currency.id());
+            meta.getPersistentDataContainer()
+                    .set(signatureKey, PersistentDataType.STRING,
+                            NoteValidator.sign(currency.id(), value));
+            meta.getPersistentDataContainer()
+                    .set(createdKey,   PersistentDataType.LONG,    now);
+
+            note.setItemMeta(meta);
+            return note;
+
+        } catch (Throwable t) {
+            SmartWithdraw.getInstance().getLogger()
+                    .severe("[SmartWithdraw] Note creation failed for "
+                            + currency.id() + " value=" + value
+                            + ": " + t.getMessage());
+            return null;
         }
-
-        meta.getPersistentDataContainer()
-                .set(valueKey,     PersistentDataType.INTEGER, value);
-        meta.getPersistentDataContainer()
-                .set(markerKey,    PersistentDataType.BYTE,    (byte) 1);
-        meta.getPersistentDataContainer()
-                .set(currencyKey,  PersistentDataType.STRING,  currency.id());
-        meta.getPersistentDataContainer()
-                .set(signatureKey, PersistentDataType.STRING,
-                        NoteValidator.sign(currency.id(), value));
-        meta.getPersistentDataContainer()
-                .set(createdKey,   PersistentDataType.LONG,    now);
-
-        note.setItemMeta(meta);
-        return note;
     }
 
-    /**
-     * Applies a Base64 skull texture to a SkullMeta using the
-     * modern Paper/Spigot PlayerProfile API (1.19+).
-     * No NMS, no reflection — clean and future-proof.
-     */
     private static void applyTexture(SkullMeta meta, String textureValue) {
 
         if (textureValue == null || textureValue.isBlank()) return;
@@ -107,8 +130,6 @@ public final class NoteFactory {
 
             String skinUrl = decoded.substring(urlStart, urlEnd);
 
-            // Deterministic UUID from texture value so identical
-            // textures always produce the same UUID — notes stack correctly
             UUID uuid = UUID.nameUUIDFromBytes(
                     textureValue.getBytes(StandardCharsets.UTF_8));
 
