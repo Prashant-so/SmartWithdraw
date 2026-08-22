@@ -13,164 +13,295 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.profile.PlayerProfile;
+import org.bukkit.profile.PlayerTextures;
 
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
+import java.util.UUID;
 
-/**
- * Bank GUI. Shows withdraw buttons for the current currency's
- * denominations, a deposit-all button, and (if more than one enabled
- * currency is configured) a button to switch currencies.
- */
 public final class BankMenu {
 
-    public static final String ACTION_KEY = "bank_action";
-    public static final String DEPOSIT_ALL_ACTION = "DEPOSIT_ALL";
-    public static final String WITHDRAW_ACTION_PREFIX = "WITHDRAW_";
+    public static final String ACTION_KEY                  = "bank_action";
+    public static final String DEPOSIT_ALL_ACTION          = "DEPOSIT_ALL";
+    public static final String DEPOSIT_HAND_ACTION         = "DEPOSIT_HAND";
+    public static final String WITHDRAW_ACTION_PREFIX      = "WITHDRAW_";
     public static final String SWITCH_CURRENCY_ACTION_PREFIX = "SWITCH_CURRENCY_";
+    public static final String BACK_ACTION                 = "BACK";
+    public static final String CLOSE_ACTION                = "CLOSE";
 
-    private static final int[] DENOMINATION_SLOTS = {10, 11, 12, 13, 14, 15, 19, 20, 21, 22, 23};
+    // Slots for denomination buttons on the detail page (row 3 and 4, centred)
+    private static final int[] DENOM_SLOTS = {19, 20, 21, 22, 23, 24, 28, 29, 30, 31, 32};
 
     private BankMenu() {
     }
 
+    // ── Entry point ───────────────────────────────────────────────────
+
     public static void open(Player player) {
-        open(player, CurrencyManager.getDefault());
+
+        if (CurrencyManager.getAllEnabled().size() == 1) {
+            openDetail(player, CurrencyManager.getDefault());
+        } else {
+            openSelection(player);
+        }
     }
 
     public static void open(Player player, Currency currency) {
+        openDetail(player, currency);
+    }
+
+    // ── Page 1: Currency Selection ────────────────────────────────────
+
+    public static void openSelection(Player player) {
+
+        BankMenuHolder holder = new BankMenuHolder();
+        holder.setOnCurrencySelectionPage(true);
+
+        Inventory inv = Bukkit.createInventory(holder, 54,
+                ChatColor.translateAlternateColorCodes('&', "&8&lSmartWithdraw &7» &6Select Currency"));
+
+        holder.setInventory(inv);
+
+        fillBorder(inv);
+
+        List<Currency> currencies = new ArrayList<>(CurrencyManager.getAllEnabled().values());
+
+        // Centre currencies in row 2 and 3 depending on count
+        int[] selectionSlots = centreSlots(currencies.size());
+
+        for (int i = 0; i < currencies.size() && i < selectionSlots.length; i++) {
+
+            Currency currency = currencies.get(i);
+
+            BalanceProvider provider = BalanceProviderRegistry.get(currency.backend());
+            long balance = (provider != null && provider.isAvailable())
+                    ? provider.getBalance(player) : 0;
+
+            ItemStack head = buildSkullItem(
+                    currency.skullTexture(),
+                    translate(currency.lore().titleColor()) + currency.name(),
+                    List.of(
+                            "§7Balance: §a" + currency.format(balance),
+                            "§7Backend: §f" + currency.backend().name(),
+                            "",
+                            "§eClick to open"
+                    ),
+                    SWITCH_CURRENCY_ACTION_PREFIX + currency.id()
+            );
+
+            inv.setItem(selectionSlots[i], head);
+        }
+
+        inv.setItem(49, buildItem(
+                Material.RED_STAINED_GLASS_PANE,
+                "§c§lClose",
+                List.of("§7Click to close the menu."),
+                CLOSE_ACTION
+        ));
+
+        player.openInventory(inv);
+    }
+
+    private static int[] centreSlots(int count) {
+        if (count == 1) return new int[]{22};
+        if (count == 2) return new int[]{21, 23};
+        if (count == 3) return new int[]{20, 22, 24};
+        if (count == 4) return new int[]{20, 21, 23, 24};
+        return new int[]{19, 20, 21, 22, 23, 24};
+    }
+
+    // ── Page 2: Currency Detail ───────────────────────────────────────
+
+    public static void openDetail(Player player, Currency currency) {
 
         BankMenuHolder holder = new BankMenuHolder();
         holder.setCurrency(currency);
+        holder.setOnCurrencySelectionPage(false);
 
-        Inventory inventory = Bukkit.createInventory(
-                holder,
-                36,
-                ChatColor.translateAlternateColorCodes('&', "&6&lSmart Bank &8- &7" + currency.name())
-        );
+        Inventory inv = Bukkit.createInventory(holder, 54,
+                ChatColor.translateAlternateColorCodes('&',
+                        "&8&lSmartWithdraw &7» &6" + currency.name() + " &7Bank"));
 
-        holder.setInventory(inventory);
+        holder.setInventory(inv);
+
+        fillBorder(inv);
 
         BalanceProvider provider = BalanceProviderRegistry.get(currency.backend());
         long balance = (provider != null && provider.isAvailable())
-                ? provider.getBalance(player)
-                : 0;
+                ? provider.getBalance(player) : 0;
 
-        inventory.setItem(4, buildItem(
+        // Slot 4 — balance display
+        inv.setItem(4, buildItem(
                 Material.GOLD_INGOT,
                 "§6§lYour Balance",
                 List.of(
-                        "§7Current balance:",
-                        "§a" + currency.format(balance)
+                        "§7Currency: §f" + currency.name(),
+                        "§7Balance: §a" + currency.format(balance)
                 ),
                 null
         ));
 
+        // Denomination buttons
         List<Integer> denominations = currency.denominations().stream().sorted().toList();
 
-        for (int i = 0; i < denominations.size() && i < DENOMINATION_SLOTS.length; i++) {
+        for (int i = 0; i < denominations.size() && i < DENOM_SLOTS.length; i++) {
 
             int value = denominations.get(i);
 
-            inventory.setItem(DENOMINATION_SLOTS[i], buildItem(
-                    Material.PAPER,
-                    "§a✦ Withdraw " + currency.format(value) + " ✦",
+            inv.setItem(DENOM_SLOTS[i], buildSkullItem(
+                    currency.skullTexture(),
+                    "§a§l" + currency.format(value),
                     List.of(
-                            "§7Click to withdraw a single",
-                            "§7" + currency.format(value) + " note."
+                            "§7Click to withdraw",
+                            "§7a single §a" + currency.format(value) + " §7note."
                     ),
                     WITHDRAW_ACTION_PREFIX + value
             ));
         }
 
-        inventory.setItem(31, buildItem(
+        // Slot 38 — deposit all
+        inv.setItem(38, buildItem(
                 Material.EMERALD,
                 "§a§lDeposit All Notes",
-                List.of("§7Click to deposit every note", "§7currently in your inventory."),
+                List.of(
+                        "§7Deposits every valid note",
+                        "§7in your inventory at once."
+                ),
                 DEPOSIT_ALL_ACTION
         ));
 
-        if (CurrencyManager.getAllEnabled().size() > 1) {
+        // Slot 42 — deposit held note
+        inv.setItem(42, buildItem(
+                Material.CHEST,
+                "§e§lDeposit Held Note",
+                List.of(
+                        "§7Deposits the note you are",
+                        "§7currently holding in your hand."
+                ),
+                DEPOSIT_HAND_ACTION
+        ));
 
-            inventory.setItem(8, buildItem(
-                    Material.NETHER_STAR,
-                    "§d§lSwitch Currency",
-                    List.of(
-                            "§7Currently viewing: §f" + currency.name(),
-                            "§7Click to see all currencies."
-                    ),
-                    "OPEN_CURRENCY_SWITCHER"
+        // Slot 45 — back (only if more than one currency)
+        if (CurrencyManager.getAllEnabled().size() > 1) {
+            inv.setItem(45, buildItem(
+                    Material.ARROW,
+                    "§7§lBack",
+                    List.of("§7Return to currency selection."),
+                    BACK_ACTION
             ));
         }
 
-        player.openInventory(inventory);
+        // Slot 49 — close
+        inv.setItem(49, buildItem(
+                Material.RED_STAINED_GLASS_PANE,
+                "§c§lClose",
+                List.of("§7Click to close the menu."),
+                CLOSE_ACTION
+        ));
+
+        player.openInventory(inv);
     }
 
-    public static void openCurrencySwitcher(Player player) {
+    // ── Helpers ───────────────────────────────────────────────────────
 
-        BankMenuHolder holder = new BankMenuHolder();
+    private static void fillBorder(Inventory inv) {
 
-        Inventory inventory = Bukkit.createInventory(
-                holder,
-                27,
-                ChatColor.translateAlternateColorCodes('&', "&d&lChoose a Currency")
+        ItemStack pane = buildItem(
+                Material.LIGHT_GRAY_STAINED_GLASS_PANE,
+                " ",
+                List.of(),
+                null
         );
 
-        holder.setInventory(inventory);
+        int size = inv.getSize();
 
-        int slot = 10;
+        for (int i = 0; i < 9; i++) inv.setItem(i, pane);
+        for (int i = size - 9; i < size; i++) inv.setItem(i, pane);
 
-        for (Currency currency : CurrencyManager.getAllEnabled().values()) {
-
-            if (slot > 16) {
-                break;
-            }
-
-            inventory.setItem(slot, buildItem(
-                    Material.PAPER,
-                    "§e" + currency.name() + (currency.isDefault() ? " §a(default)" : ""),
-                    List.of("§7Click to open the bank", "§7for this currency."),
-                    SWITCH_CURRENCY_ACTION_PREFIX + currency.id()
-            ));
-
-            slot++;
+        for (int row = 1; row < size / 9 - 1; row++) {
+            inv.setItem(row * 9, pane);
+            inv.setItem(row * 9 + 8, pane);
         }
-
-        player.openInventory(inventory);
     }
 
-    private static ItemStack buildItem(Material material,
-                                        String name,
-                                        List<String> lore,
-                                        String action) {
+    public static ItemStack buildItem(Material material, String name,
+                                       List<String> lore, String action) {
 
         ItemStack item = new ItemStack(material);
-        ItemMeta meta = item.getItemMeta();
+        ItemMeta  meta = item.getItemMeta();
 
-        if (meta == null) {
-            return item;
-        }
+        if (meta == null) return item;
 
         meta.setDisplayName(name);
         meta.setLore(new ArrayList<>(lore));
 
         if (action != null) {
-
-            NamespacedKey actionKey = new NamespacedKey(
-                    SmartWithdraw.getInstance(),
-                    ACTION_KEY
-            );
-
             meta.getPersistentDataContainer().set(
-                    actionKey,
+                    new NamespacedKey(SmartWithdraw.getInstance(), ACTION_KEY),
                     PersistentDataType.STRING,
                     action
             );
         }
 
         item.setItemMeta(meta);
-
         return item;
+    }
+
+    public static ItemStack buildSkullItem(String textureValue, String name,
+                                            List<String> lore, String action) {
+
+        ItemStack item = new ItemStack(Material.PLAYER_HEAD);
+        SkullMeta meta = (SkullMeta) item.getItemMeta();
+
+        if (meta == null) return item;
+
+        if (textureValue != null && !textureValue.isBlank()) {
+            try {
+                String decoded = new String(
+                        Base64.getDecoder().decode(textureValue),
+                        StandardCharsets.UTF_8);
+
+                int urlStart = decoded.indexOf("\"url\":\"") + 7;
+                int urlEnd   = decoded.indexOf("\"", urlStart);
+
+                if (urlStart >= 7 && urlEnd > urlStart) {
+                    String skinUrl = decoded.substring(urlStart, urlEnd);
+                    UUID uuid = UUID.nameUUIDFromBytes(
+                            textureValue.getBytes(StandardCharsets.UTF_8));
+                    PlayerProfile profile = SmartWithdraw.getInstance()
+                            .getServer().createPlayerProfile(uuid, "SmartWithdraw");
+                    PlayerTextures textures = profile.getTextures();
+                    textures.setSkin(new URL(skinUrl));
+                    profile.setTextures(textures);
+                    meta.setOwnerProfile(profile);
+                }
+            } catch (MalformedURLException | IllegalArgumentException ignored) {
+            }
+        }
+
+        meta.setDisplayName(name);
+        meta.setLore(new ArrayList<>(lore));
+
+        if (action != null) {
+            meta.getPersistentDataContainer().set(
+                    new NamespacedKey(SmartWithdraw.getInstance(), ACTION_KEY),
+                    PersistentDataType.STRING,
+                    action
+            );
+        }
+
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private static String translate(String s) {
+        return ChatColor.translateAlternateColorCodes('&', s);
     }
 }
