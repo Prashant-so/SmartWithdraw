@@ -95,20 +95,16 @@ public class SmartWithdrawCommand implements CommandExecutor, TabCompleter {
         if (args.length >= 2) {
             currency = CurrencyManager.get(args[1]).orElse(null);
             if (currency == null) {
-                Lang.send(player, "unknown-currency",
-                        Map.of("currency", args[1]));
+                Lang.send(player, "unknown-currency", Map.of("currency", args[1]));
                 return;
             }
         }
         if (!currency.hasDailyLimit()) {
-            player.sendMessage("§7Daily limit for §f" + currency.name()
-                    + "§7: §aUnlimited");
+            player.sendMessage("§7Daily limit for §f" + currency.name() + "§7: §aUnlimited");
             return;
         }
-        long used  = DailyLimitManager.getWithdrawn(
-                player.getUniqueId(), currency.id());
-        String reset = DailyLimitManager.resetString(
-                player.getUniqueId(), currency.id());
+        long used  = DailyLimitManager.getWithdrawn(player.getUniqueId(), currency.id());
+        String reset = DailyLimitManager.resetString(player.getUniqueId(), currency.id());
         Lang.send(player, "daily-limit-info", Map.of(
                 "used",     currency.format(used),
                 "limit",    currency.format(currency.dailyLimit()),
@@ -147,8 +143,7 @@ public class SmartWithdrawCommand implements CommandExecutor, TabCompleter {
         if (args.length == 4) {
             currency = CurrencyManager.get(args[3]).orElse(null);
             if (currency == null) {
-                Lang.send(sender, "unknown-currency",
-                        Map.of("currency", args[3]));
+                Lang.send(sender, "unknown-currency", Map.of("currency", args[3]));
                 return;
             }
         }
@@ -173,8 +168,7 @@ public class SmartWithdrawCommand implements CommandExecutor, TabCompleter {
                     }
                 }
             } else {
-                InventoryUtils.give(target,
-                        NoteFactory.createNote(currency, amount));
+                InventoryUtils.give(target, NoteFactory.createNote(currency, amount));
             }
             TransactionLogger.log("ADMIN_GIVE", target, currency.id(), amount);
             Lang.send(sender, "give-success", Map.of(
@@ -207,9 +201,9 @@ public class SmartWithdrawCommand implements CommandExecutor, TabCompleter {
     }
 
     private void sendHelp(CommandSender sender) {
-        Currency def = CurrencyManager.getDefault();
+
         sender.sendMessage("§8§m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        sender.sendMessage("§6§l💰 SmartWithdraw Help");
+        sender.sendMessage("§6§l💰 SmartWithdraw");
         sender.sendMessage("");
         sender.sendMessage("§e/withdraw <amount> [currency]  §7➜ Withdraw as notes");
         sender.sendMessage("§e/deposit                       §7➜ Deposit all notes");
@@ -217,19 +211,15 @@ public class SmartWithdrawCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§e/sw currencies                 §7➜ List currencies");
         sender.sendMessage("§e/sw inspect                    §7➜ Inspect held note");
         sender.sendMessage("§e/sw limit [currency]           §7➜ View daily limit");
-        sender.sendMessage("§e/sw give <player> <amount> [currency] §7➜ §8(admin)");
-        sender.sendMessage("§e/sw reload                     §7➜ §8(admin) reload");
-        sender.sendMessage("");
-        sender.sendMessage("§6Default (" + def.id() + ") denominations:");
-        StringBuilder line = new StringBuilder();
-        String[] colors = {"§a", "§6", "§b", "§d", "§e", "§5"};
-        int i = 0;
-        for (int value : def.denominations().stream().sorted().toList()) {
-            line.append(colors[i % colors.length])
-                    .append(def.format(value)).append("  ");
-            i++;
+
+        if (sender.hasPermission("smartwithdraw.admin.give")) {
+            sender.sendMessage("§c/sw give <player> <amount> [currency] §7➜ Give notes");
         }
-        sender.sendMessage(line.toString());
+
+        if (sender.hasPermission("smartwithdraw.admin.reload")) {
+            sender.sendMessage("§c/sw reload                     §7➜ Reload config");
+        }
+
         sender.sendMessage("§8§m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     }
 
