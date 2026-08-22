@@ -37,10 +37,7 @@ public class BankMenuListener implements Listener {
     @EventHandler
     public void onClick(InventoryClickEvent event) {
 
-        if (!(event.getInventory().getHolder()
-                instanceof BankMenuHolder holder)) {
-            return;
-        }
+        if (!(event.getInventory().getHolder() instanceof BankMenuHolder holder)) return;
 
         event.setCancelled(true);
 
@@ -50,57 +47,61 @@ public class BankMenuListener implements Listener {
         ItemMeta meta = clicked.getItemMeta();
         if (meta == null) return;
 
-        NamespacedKey actionKey = new NamespacedKey(
-                SmartWithdraw.getInstance(), BankMenu.ACTION_KEY);
-
-        String action = meta.getPersistentDataContainer()
-                .get(actionKey, PersistentDataType.STRING);
+        String action = meta.getPersistentDataContainer().get(
+                new NamespacedKey(SmartWithdraw.getInstance(), BankMenu.ACTION_KEY),
+                PersistentDataType.STRING);
 
         if (action == null) return;
 
-        Player   player   = (Player) event.getWhoClicked();
-        Currency currency = holder.getCurrency() != null
-                ? holder.getCurrency()
-                : CurrencyManager.getDefault();
+        Player player = (Player) event.getWhoClicked();
 
-        if (action.equals(BankMenu.DEPOSIT_ALL_ACTION)) {
-            depositAll(player);
-            return;
-        }
+        switch (action) {
 
-        if (action.equals("OPEN_CURRENCY_SWITCHER")) {
-            BankMenu.openCurrencySwitcher(player);
-            return;
-        }
+            case BankMenu.CLOSE_ACTION -> player.closeInventory();
 
-        if (action.startsWith(BankMenu.SWITCH_CURRENCY_ACTION_PREFIX)) {
-            String id = action.substring(BankMenu.SWITCH_CURRENCY_ACTION_PREFIX.length());
-            CurrencyManager.get(id).ifPresentOrElse(
-                    c -> BankMenu.open(player, c),
-                    () -> BankMenu.open(player));
-            return;
-        }
+            case BankMenu.BACK_ACTION -> BankMenu.openSelection(player);
 
-        if (action.startsWith(BankMenu.WITHDRAW_ACTION_PREFIX)) {
-            int value = Integer.parseInt(
-                    action.substring(BankMenu.WITHDRAW_ACTION_PREFIX.length()));
-            withdrawOne(player, currency, value);
+            case BankMenu.DEPOSIT_ALL_ACTION -> depositAll(player);
+
+            case BankMenu.DEPOSIT_HAND_ACTION -> depositHand(player,
+                    holder.getCurrency() != null
+                            ? holder.getCurrency()
+                            : CurrencyManager.getDefault());
+
+            default -> {
+
+                if (action.startsWith(BankMenu.SWITCH_CURRENCY_ACTION_PREFIX)) {
+                    String id = action.substring(
+                            BankMenu.SWITCH_CURRENCY_ACTION_PREFIX.length());
+                    CurrencyManager.get(id).ifPresentOrElse(
+                            c -> BankMenu.openDetail(player, c),
+                            () -> BankMenu.openSelection(player));
+                    return;
+                }
+
+                if (action.startsWith(BankMenu.WITHDRAW_ACTION_PREFIX)) {
+                    Currency currency = holder.getCurrency() != null
+                            ? holder.getCurrency()
+                            : CurrencyManager.getDefault();
+                    int value = Integer.parseInt(
+                            action.substring(BankMenu.WITHDRAW_ACTION_PREFIX.length()));
+                    withdrawOne(player, currency, value);
+                }
+            }
         }
     }
 
     private void withdrawOne(Player player, Currency currency, int value) {
 
         if (!currency.isWorldAllowed(player.getWorld().getName())) {
-            Lang.send(player, "world-not-allowed",
-                    Map.of("currency", currency.name()));
+            Lang.send(player, "world-not-allowed", Map.of("currency", currency.name()));
             return;
         }
 
         BalanceProvider provider = BalanceProviderRegistry.get(currency.backend());
 
         if (provider == null || !provider.isAvailable()) {
-            Lang.send(player, "backend-unavailable",
-                    Map.of("currency", currency.id()));
+            Lang.send(player, "backend-unavailable", Map.of("currency", currency.id()));
             return;
         }
 
@@ -109,15 +110,13 @@ public class BankMenuListener implements Listener {
         long remaining = CooldownManager.remainingWithdrawSeconds(player, cooldownSeconds);
 
         if (remaining > 0) {
-            Lang.send(player, "on-cooldown",
-                    Map.of("seconds", String.valueOf(remaining)));
+            Lang.send(player, "on-cooldown", Map.of("seconds", String.valueOf(remaining)));
             return;
         }
 
         if (currency.hasDailyLimit()) {
             boolean allowed = DailyLimitManager.tryWithdraw(
-                    player.getUniqueId(), currency.id(),
-                    value, currency.dailyLimit());
+                    player.getUniqueId(), currency.id(), value, currency.dailyLimit());
             if (!allowed) {
                 Lang.send(player, "daily-limit-reached", Map.of(
                         "limit",    currency.format(currency.dailyLimit()),
@@ -143,10 +142,9 @@ public class BankMenuListener implements Listener {
 
         long maxHeld = SmartWithdraw.getInstance().getConfig()
                 .getLong("limits.max-held-value", 0);
-
         if (maxHeld > 0) {
-            long currentlyHeld = InventoryUtils.sumHeldNoteValue(player, currency);
-            if (currentlyHeld + value > maxHeld) {
+            long held = com.smartwithdraw.util.InventoryUtils.sumHeldNoteValue(player, currency);
+            if (held + value > maxHeld) {
                 if (currency.hasDailyLimit()) {
                     DailyLimitManager.refund(player.getUniqueId(), currency.id(), value);
                 }
@@ -191,12 +189,75 @@ public class BankMenuListener implements Listener {
         }
     }
 
+    private void depositHand(Player player, Currency currency) {
+
+        ItemStack held = player.getInventory().getItemInMainHand();
+
+        if (held == null || held.getType().isAir()) {
+            player.sendMessage("§c§l✖ §cYou are not holding a note.");
+            return;
+        }
+
+        Optional<NoteInfo> infoOpt = NoteValidator.getInfo(held);
+
+        if (infoOpt.isEmpty()) {
+            player.sendMessage("§c§l✖ §cThat item is not a valid note.");
+            return;
+        }
+
+        NoteInfo info = infoOpt.get();
+
+        if (NoteValidator.isExpired(info)) {
+            NoteExpiryListener.scanAndDestroy(player);
+            return;
+        }
+
+        BalanceProvider provider =
+                BalanceProviderRegistry.get(info.currency().backend());
+
+        if (provider == null || !provider.isAvailable()) {
+            Lang.send(player, "backend-unavailable",
+                    Map.of("currency", info.currency().id()));
+            return;
+        }
+
+        long total = (long) info.value() * held.getAmount();
+
+        TaxConfig tax     = info.currency().tax();
+        long taxAmount    = tax.applyOnDeposit() ? tax.calculateTax(total) : 0;
+        long creditAmount = Math.max(0, total - taxAmount);
+
+        boolean deposited = provider.deposit(player, creditAmount);
+
+        if (!deposited) {
+            Lang.send(player, "backend-unavailable",
+                    Map.of("currency", info.currency().id()));
+            return;
+        }
+
+        player.getInventory().setItemInMainHand(null);
+        TransactionLogger.log("DEPOSIT", player, info.currency().id(), creditAmount);
+        SoundUtil.play(player, "deposit");
+
+        if (taxAmount > 0) {
+            TransactionLogger.log("TAX_DEPOSIT", player,
+                    info.currency().id(), taxAmount);
+            Lang.send(player, "deposit-success-taxed", Map.of(
+                    "amount", info.currency().format(creditAmount),
+                    "tax",    info.currency().format(taxAmount)
+            ));
+        } else {
+            Lang.send(player, "deposit-success",
+                    Map.of("amount", info.currency().format(creditAmount)));
+        }
+    }
+
     private void depositAll(Player player) {
 
         NoteExpiryListener.scanAndDestroy(player);
 
         Map<String, Long>     depositedByCurrency = new HashMap<>();
-        Map<String, Currency> currencyById        = new HashMap<>();
+        Map<String, com.smartwithdraw.currency.Currency> currencyById = new HashMap<>();
         List<ItemStack>       toRemove            = new ArrayList<>();
 
         for (ItemStack item : player.getInventory().getContents()) {
@@ -226,8 +287,9 @@ public class BankMenuListener implements Listener {
 
         for (Map.Entry<String, Long> entry : depositedByCurrency.entrySet()) {
 
-            Currency currency = currencyById.get(entry.getKey());
-            long rawAmount    = entry.getValue();
+            com.smartwithdraw.currency.Currency currency =
+                    currencyById.get(entry.getKey());
+            long rawAmount = entry.getValue();
 
             BalanceProvider provider =
                     BalanceProviderRegistry.get(currency.backend());
@@ -256,7 +318,8 @@ public class BankMenuListener implements Listener {
             SoundUtil.play(player, "deposit");
 
             if (taxAmount > 0) {
-                TransactionLogger.log("TAX_DEPOSIT", player, currency.id(), taxAmount);
+                TransactionLogger.log("TAX_DEPOSIT", player,
+                        currency.id(), taxAmount);
                 Lang.send(player, "deposit-success-taxed", Map.of(
                         "amount", currency.format(creditAmount),
                         "tax",    currency.format(taxAmount)
