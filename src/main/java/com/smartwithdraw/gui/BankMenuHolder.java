@@ -8,6 +8,7 @@ public class BankMenuHolder implements InventoryHolder {
 
     private Inventory inventory;
     private Currency currency;
+    private boolean onCurrencySelectionPage;
 
     @Override
     public Inventory getInventory() {
@@ -24,5 +25,13 @@ public class BankMenuHolder implements InventoryHolder {
 
     public void setCurrency(Currency currency) {
         this.currency = currency;
+    }
+
+    public boolean isOnCurrencySelectionPage() {
+        return onCurrencySelectionPage;
+    }
+
+    public void setOnCurrencySelectionPage(boolean onCurrencySelectionPage) {
+        this.onCurrencySelectionPage = onCurrencySelectionPage;
     }
 }
