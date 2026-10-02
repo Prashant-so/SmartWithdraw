@@ -9,6 +9,7 @@ import com.smartwithdraw.currency.DenominationCalculator;
 import com.smartwithdraw.currency.NoteFactory;
 import com.smartwithdraw.currency.TaxConfig;
 import com.smartwithdraw.logging.TransactionLogger;
+import com.smartwithdraw.util.AmountUtil;
 import com.smartwithdraw.util.CooldownManager;
 import com.smartwithdraw.util.DailyLimitManager;
 import com.smartwithdraw.util.InventoryUtils;
@@ -24,6 +25,7 @@ import org.bukkit.inventory.ItemStack;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalInt;
 
 public class WithdrawCommand implements CommandExecutor, TabCompleter {
 
@@ -37,7 +39,9 @@ public class WithdrawCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length < 1 || args.length > 2) {
-            player.sendMessage("§cUsage: /withdraw <amount> [currency]");
+            player.sendMessage("§cUsage: /withdraw <amount> [currency]"
+                    + (AmountUtil.isShorthandInputEnabled()
+                            ? " §7(e.g. 1000, 10k, 2.5m)" : ""));
             return true;
         }
 
@@ -83,18 +87,12 @@ public class WithdrawCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        int amount;
-        try {
-            long parsed = Long.parseLong(args[0]);
-            if (parsed <= 0 || parsed > Integer.MAX_VALUE) {
-                Lang.send(player, "invalid-amount");
-                return true;
-            }
-            amount = (int) parsed;
-        } catch (NumberFormatException ex) {
+        OptionalInt parsedAmount = AmountUtil.parse(args[0]);
+        if (parsedAmount.isEmpty()) {
             Lang.send(player, "invalid-amount");
             return true;
         }
+        int amount = parsedAmount.getAsInt();
 
         TaxConfig tax    = currency.tax();
         long taxAmount   = tax.applyOnWithdraw() ? tax.calculateTax(amount) : 0;
@@ -136,8 +134,30 @@ public class WithdrawCommand implements CommandExecutor, TabCompleter {
         List<ItemStack> notesToGive = new ArrayList<>();
 
         if (autoSplit) {
-            for (Map.Entry<Integer, Integer> entry :
-                    DenominationCalculator.calculate(amount, currency).entrySet()) {
+            Map<Integer, Integer> split = DenominationCalculator.calculate(amount, currency);
+
+            // Shorthand makes huge amounts a few keystrokes away (e.g. 2b), so cap
+            // how many physical notes one command may create. 0 = unlimited.
+            int maxNotes = plugin.getConfig().getInt("limits.max-notes-per-withdraw", 500);
+            long noteCount = 0;
+            for (int count : split.values()) noteCount += count;
+
+            if (maxNotes > 0 && noteCount > maxNotes) {
+                if (currency.hasDailyLimit()) {
+                    DailyLimitManager.refund(player.getUniqueId(), currency.id(), amount);
+                }
+                if (plugin.getConfig().contains("messages.too-many-notes")) {
+                    Lang.send(player, "too-many-notes",
+                            Map.of("max", String.valueOf(maxNotes)));
+                } else {
+                    // Older config.yml without the new message key
+                    player.sendMessage("§c§l✖ §cThat amount would create more than §f"
+                            + maxNotes + " §cnotes. Withdraw a smaller amount.");
+                }
+                return true;
+            }
+
+            for (Map.Entry<Integer, Integer> entry : split.entrySet()) {
                 for (int i = 0; i < entry.getValue(); i++) {
                     ItemStack note = NoteFactory.createNote(currency, entry.getKey());
                     if (note == null) {
@@ -202,6 +222,12 @@ public class WithdrawCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command,
                                        String label, String[] args) {
         List<String> completions = new ArrayList<>();
+        if (args.length == 1 && AmountUtil.isShorthandInputEnabled()) {
+            String partial = args[0].toLowerCase();
+            for (String suggestion : List.of("1k", "10k", "100k", "1m")) {
+                if (suggestion.startsWith(partial)) completions.add(suggestion);
+            }
+        }
         if (args.length == 2) {
             String partial = args[1].toLowerCase();
             CurrencyManager.getAllEnabled().keySet().stream()
