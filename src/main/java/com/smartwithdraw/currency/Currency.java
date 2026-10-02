@@ -1,5 +1,7 @@
 package com.smartwithdraw.currency;
 
+import com.smartwithdraw.util.AmountUtil;
+
 import java.util.List;
 
 public record Currency(
@@ -28,7 +30,7 @@ public record Currency(
     public String format(long amount) {
         return format
                 .replace("%symbol%", symbol)
-                .replace("%amount%", Long.toString(amount))
+                .replace("%amount%", AmountUtil.format(amount))
                 .replace("%name%", getDisplayName(amount));
     }
 
