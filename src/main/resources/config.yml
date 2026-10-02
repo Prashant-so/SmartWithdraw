@@ -128,6 +128,24 @@ notes:
   glow-effect: false
   type-label: "Satchel"
 
+# ── NUMBER FORMAT ────────────────────────────────────────────────────
+# Short-hand amounts: k = thousand, m = million, b = billion
+#
+# shorthand-input:   true  -> /withdraw 1k, /withdraw 2.5m, /sw give Steve 1b
+#                    false -> only plain numbers (/withdraw 1000) are accepted
+# shorthand-display: true  -> lore, messages, GUI and placeholders show 1k / 1.5m
+#                    false -> full numbers are shown (1000, 1500000)
+# max-decimals:      0-3. Display is truncated, never rounded up
+#                    (1,234 shows as 1.23k with 2 decimals).
+#
+# Note: a note's value is stored exactly and signed — shorthand only changes
+# how numbers are typed and displayed. The largest single note is still
+# 2,147,483,647 (about 2.14b).
+number-format:
+  shorthand-input: true
+  shorthand-display: true
+  max-decimals: 2
+
 # ── SOUNDS ───────────────────────────────────────────────────────────
 sounds:
   enabled: true
@@ -143,6 +161,9 @@ limits:
   withdraw-cooldown-seconds: 5
   deposit-cooldown-seconds: 0
   max-held-value: 0
+  # Max physical notes one /withdraw may create when auto-split-notes is true.
+  # Protects the server from huge amounts like 2b. 0 = unlimited.
+  max-notes-per-withdraw: 500
 
 # ── EXPIRY ───────────────────────────────────────────────────────────
 expiry:
@@ -167,6 +188,7 @@ messages:
   withdraw-success-taxed: "&a&l✦ &aWithdrew &f%amount% &8(&c-%tax% tax&8) &a✦"
   insufficient-funds: "&c&l✖ &cInsufficient balance."
   invalid-amount: "&c&l✖ &cPlease enter a valid positive amount."
+  too-many-notes: "&c&l✖ &cThat amount would create more than &f%max% &cnotes. Withdraw a smaller amount."
   deposit-success: "&a&l✦ &aDeposited &f%amount% &a✦"
   deposit-success-taxed: "&a&l✦ &aDeposited &f%amount% &8(&c-%tax% tax&8) &a✦"
   no-notes-to-deposit: "&c&l✖ &cYou have no valid notes to deposit."
