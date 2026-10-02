@@ -9,6 +9,7 @@ import com.smartwithdraw.gui.BankMenu;
 import com.smartwithdraw.gui.InspectMenu;
 import com.smartwithdraw.logging.TransactionLogger;
 import com.smartwithdraw.storage.PendingNoteStorage;
+import com.smartwithdraw.util.AmountUtil;
 import com.smartwithdraw.util.DailyLimitManager;
 import com.smartwithdraw.util.InventoryUtils;
 import com.smartwithdraw.util.Lang;
@@ -25,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalInt;
 
 public class SmartWithdrawCommand implements CommandExecutor, TabCompleter {
 
@@ -126,18 +128,12 @@ public class SmartWithdrawCommand implements CommandExecutor, TabCompleter {
         }
 
         String targetName = args[1];
-        int amount;
-        try {
-            long parsed = Long.parseLong(args[2]);
-            if (parsed <= 0 || parsed > Integer.MAX_VALUE) {
-                Lang.send(sender, "invalid-amount");
-                return;
-            }
-            amount = (int) parsed;
-        } catch (NumberFormatException e) {
+        OptionalInt parsedAmount = AmountUtil.parse(args[2]);
+        if (parsedAmount.isEmpty()) {
             Lang.send(sender, "invalid-amount");
             return;
         }
+        int amount = parsedAmount.getAsInt();
 
         Currency currency = CurrencyManager.getDefault();
         if (args.length == 4) {
@@ -243,6 +239,13 @@ public class SmartWithdrawCommand implements CommandExecutor, TabCompleter {
                 Bukkit.getOnlinePlayers().stream()
                         .map(Player::getName)
                         .filter(n -> n.toLowerCase().startsWith(partial))
+                        .forEach(completions::add);
+                return completions;
+            }
+            if (args.length == 3 && AmountUtil.isShorthandInputEnabled()) {
+                String partial = args[2].toLowerCase();
+                Arrays.asList("1k", "10k", "100k", "1m")
+                        .stream().filter(n -> n.startsWith(partial))
                         .forEach(completions::add);
                 return completions;
             }
