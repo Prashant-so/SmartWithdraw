@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "com.smartwithdraw"
-version = "2.0.0"
+version = (findProperty("pluginVersion") as String?) ?: "4.0.0"
 
 repositories {
     mavenCentral()
@@ -33,5 +33,13 @@ dependencies {
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
+// Puts the build version into plugin.yml so the jar's internal version
+// always matches the release tag.
+tasks.processResources {
+    filesMatching("plugin.yml") {
+        expand("version" to project.version)
     }
 }
