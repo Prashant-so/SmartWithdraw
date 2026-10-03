@@ -6,15 +6,18 @@ import com.smartwithdraw.command.WithdrawCommand;
 import com.smartwithdraw.currency.CurrencyManager;
 import com.smartwithdraw.currency.NoteFactory;
 import com.smartwithdraw.economy.EconomyManager;
+import com.smartwithdraw.health.HealthManager;
 import com.smartwithdraw.listener.BankMenuListener;
 import com.smartwithdraw.listener.NoteExpiryListener;
 import com.smartwithdraw.listener.NoteRedeemListener;
 import com.smartwithdraw.listener.NoteSplitListener;
+import com.smartwithdraw.listener.PlatformListener;
 import com.smartwithdraw.logging.TransactionLogger;
 import com.smartwithdraw.placeholder.SmartWithdrawExpansion;
 import com.smartwithdraw.security.NoteValidator;
 import com.smartwithdraw.security.SecretKeyManager;
 import com.smartwithdraw.storage.PendingNoteStorage;
+import com.smartwithdraw.update.UpdateManager;
 import com.smartwithdraw.util.CooldownManager;
 import com.smartwithdraw.util.DailyLimitManager;
 import org.bukkit.Bukkit;
@@ -24,6 +27,8 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.io.File;
 
 public final class SmartWithdraw extends JavaPlugin {
 
@@ -36,12 +41,10 @@ public final class SmartWithdraw extends JavaPlugin {
 
         saveDefaultConfig();
 
-        if (!EconomyManager.setupEconomy()) {
-            getLogger().severe(
-                    "Vault not found or no economy plugin installed! Disabling.");
-            getServer().getPluginManager().disablePlugin(this);
-            return;
-        }
+        // Vault/economy is no longer a hard requirement here. If it is
+        // missing the plugin still loads, the affected currencies report
+        // "backend unavailable", and HealthManager tells the admins why.
+        EconomyManager.setupEconomy();
 
         SecretKeyManager.load();
         CurrencyManager.load();
@@ -78,6 +81,8 @@ public final class SmartWithdraw extends JavaPlugin {
                 .registerEvents(new BankMenuListener(), this);
         getServer().getPluginManager()
                 .registerEvents(new NoteExpiryListener(), this);
+        getServer().getPluginManager()
+                .registerEvents(new PlatformListener(), this);
 
         getServer().getPluginManager().registerEvents(new Listener() {
 
@@ -118,11 +123,17 @@ public final class SmartWithdraw extends JavaPlugin {
             getLogger().info("Hooked into PlayerPoints.");
         }
 
+        // Feature 2: dependency health check (runs on the first server tick)
+        HealthManager.init();
+        // Feature 1: update checker (first check ~5s after start, then every N hours)
+        UpdateManager.init();
+
         getLogger().info("SmartWithdraw enabled successfully.");
     }
 
     @Override
     public void onDisable() {
+        UpdateManager.shutdown();
         CooldownManager.save();
         DailyLimitManager.save();
         TransactionLogger.close();
@@ -131,5 +142,10 @@ public final class SmartWithdraw extends JavaPlugin {
 
     public static SmartWithdraw getInstance() {
         return instance;
+    }
+
+    /** The plugin's own jar file (getFile() is protected, so exposed here). */
+    public File getJarFile() {
+        return getFile();
     }
 }
