@@ -1,8 +1,5 @@
 package com.smartwithdraw.update;
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import com.smartwithdraw.SmartWithdraw;
 import com.smartwithdraw.util.Chat;
 import net.md_5.bungee.api.chat.BaseComponent;
@@ -11,41 +8,17 @@ import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.URI;
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.AtomicMoveNotSupportedException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.security.MessageDigest;
 import java.time.Duration;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HexFormat;
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.jar.JarFile;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 /**
  * GitHub-release based update checker + safe installer.
@@ -63,9 +36,7 @@ public final class UpdateManager {
 
     public static final String PERMISSION = "smartwithdraw.admin.update";
 
-    private static final String API_URL = "https://api.github.com/repos/%s/releases/latest";
     private static final Pattern REPO_PATTERN = Pattern.compile("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+");
-    private static final long MAX_JAR_BYTES = 25L * 1024 * 1024;
     private static final long MIN_CHECK_GAP_MS = 30_000L;
 
     private static final AtomicBoolean checking = new AtomicBoolean(false);
@@ -88,7 +59,7 @@ public final class UpdateManager {
     // ── lifecycle ────────────────────────────────────────────────────
 
     public static void init() {
-        cleanupLeftovers();
+        UpdateInstaller.cleanupLeftovers();
         schedule();
     }
 
@@ -157,7 +128,7 @@ public final class UpdateManager {
             ReleaseInfo found = null;
             String error = null;
             try {
-                found = fetchLatest(repo);
+                found = GitHubReleases.fetchLatest(http, repo);
             } catch (Exception e) {
                 error = friendly(e);
             } finally {
@@ -171,68 +142,6 @@ public final class UpdateManager {
                 if (done != null) done.run();
             });
         });
-    }
-
-    private static ReleaseInfo fetchLatest(String repo) throws IOException, InterruptedException {
-        if (repo == null) {
-            throw new IOException("Set update.github-repo (OWNER/REPO) in config.yml");
-        }
-        HttpRequest req = HttpRequest.newBuilder(URI.create(String.format(API_URL, repo)))
-                .timeout(Duration.ofSeconds(15))
-                .header("Accept", "application/vnd.github+json")
-                .header("User-Agent", "SmartWithdraw-UpdateChecker")
-                .GET()
-                .build();
-
-        HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString());
-        int code = res.statusCode();
-        if (code == 404) {
-            throw new IOException("No published release found for " + repo
-                    + " (repo must be public and have a release)");
-        }
-        if (code == 403 || code == 429) {
-            throw new IOException("GitHub rate limit reached - will retry later");
-        }
-        if (code != 200) {
-            throw new IOException("GitHub answered HTTP " + code);
-        }
-
-        JsonObject o = JsonParser.parseString(res.body()).getAsJsonObject();
-        String tag = str(o, "tag_name");
-        if (tag == null) throw new IOException("Latest release has no tag");
-
-        String version = Version.clean(tag);
-        String page = str(o, "html_url");
-
-        String url = null;
-        String name = null;
-        String digest = null;
-        long size = 0;
-
-        if (o.has("assets") && o.get("assets").isJsonArray()) {
-            for (JsonElement el : o.getAsJsonArray("assets")) {
-                if (!el.isJsonObject()) continue;
-                JsonObject a = el.getAsJsonObject();
-                String assetName = str(a, "name");
-                if (assetName == null) continue;
-                String low = assetName.toLowerCase(Locale.ROOT);
-                if (!low.endsWith(".jar") || low.contains("sources") || low.contains("javadoc")) continue;
-                String dl = str(a, "browser_download_url");
-                if (!trusted(dl)) continue;
-
-                url = dl;
-                name = assetName;
-                if (a.has("size") && a.get("size").isJsonPrimitive()) {
-                    size = a.get("size").getAsLong();
-                }
-                String d = str(a, "digest");
-                if (d != null && d.toLowerCase(Locale.ROOT).startsWith("sha256:")) {
-                    digest = d.substring(7);
-                }
-                break;
-            }
-        }
-        return new ReleaseInfo(version, page, url, name, size, digest);
     }
 
     private static void applyCheckResult(ReleaseInfo found, String error, boolean manual) {
@@ -383,7 +292,7 @@ public final class UpdateManager {
             String backup = null;
             String error = null;
             try {
-                backup = stage(r, keep);
+                backup = UpdateInstaller.stage(http, r, keep);
             } catch (Exception e) {
                 error = friendly(e);
             } finally {
@@ -423,63 +332,43 @@ public final class UpdateManager {
         }
     }
 
-    /**
-     * Runs on an async thread. Returns the backup folder path for display.
-     * Any failure throws BEFORE the update folder is touched.
-     */
-    private static String stage(ReleaseInfo r, int keepBackups) throws Exception {
-        SmartWithdraw plugin = SmartWithdraw.getInstance();
-        Path data = plugin.getDataFolder().toPath();
-        Path cache = data.resolve("update-cache");
-        Files.createDirectories(cache);
+    // ── helpers ──────────────────────────────────────────────────────
 
-        String safe = r.version().replaceAll("[^A-Za-z0-9._-]", "_");
-        Path part = cache.resolve("download-" + safe + ".part");
-        Files.deleteIfExists(part);
+    public static String currentVersion() {
+        return Version.clean(SmartWithdraw.getInstance().getDescription().getVersion());
+    }
 
-        try {
-            // 1. download into our own cache folder (never into plugins/update)
-            if (r.size() > MAX_JAR_BYTES) {
-                throw new IOException("Release file is larger than the 25 MB safety limit");
-            }
-            HttpRequest req = HttpRequest.newBuilder(URI.create(r.downloadUrl()))
-                    .timeout(Duration.ofSeconds(60))
-                    .header("User-Agent", "SmartWithdraw-UpdateChecker")
-                    .header("Accept", "application/octet-stream")
-                    .GET()
-                    .build();
+    private static FileConfiguration cfg() {
+        return SmartWithdraw.getInstance().getConfig();
+    }
 
-            CompletableFuture<HttpResponse<Path>> future =
-                    http.sendAsync(req, HttpResponse.BodyHandlers.ofFile(part));
-            HttpResponse<Path> res;
-            try {
-                res = future.get(120, TimeUnit.SECONDS);
-            } catch (TimeoutException e) {
-                future.cancel(true);
-                throw new IOException("Download timed out");
-            } catch (ExecutionException e) {
-                Throwable c = e.getCause() != null ? e.getCause() : e;
-                throw new IOException("Download failed: " + c.getMessage());
-            }
-            if (res.statusCode() != 200) {
-                throw new IOException("Download failed (HTTP " + res.statusCode() + ")");
-            }
+    private static boolean enabled() {
+        return cfg().getBoolean("update.enabled", true);
+    }
 
-            // 2. verify before anything else happens
-            long len = Files.size(part);
-            if (len <= 0 || len > MAX_JAR_BYTES) throw new IOException("Downloaded file has an invalid size");
-            if (r.size() > 0 && len != r.size()) throw new IOException("Download is incomplete (size mismatch)");
-            if (r.sha256() != null && !r.sha256().equalsIgnoreCase(sha256(part))) {
-                throw new IOException("Checksum mismatch - the file was corrupted or altered");
-            }
-            verifyJar(part, r);
+    private static boolean allowInstall() {
+        return cfg().getBoolean("update.allow-install", true);
+    }
 
-            // 3. back up current jar + config + data files (abort on failure)
-            String backup = backup(data, r.version(), keepBackups);
+    private static String repo() {
+        String r = cfg().getString("update.github-repo", "");
+        r = r == null ? "" : r.trim();
+        return REPO_PATTERN.matcher(r).matches() ? r : null;
+    }
 
-            // 4. stage atomically: copy to a non-.jar temp name, then rename
-            Path updateDir = Bukkit.getUpdateFolderFile().toPath();
-            Files.createDirectories(updateDir);
-            String jarName = plugin.getJarFile().getName();
-            Path tmp = updateDir.resolve(jarName + ".swtmp");
- 
+    private static Logger log() {
+        return SmartWithdraw.getInstance().getLogger();
+    }
+
+    private static String friendly(Exception e) {
+        if (e instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
+            return "Interrupted";
+        }
+        if (e instanceof java.net.ConnectException || e instanceof java.net.http.HttpTimeoutException) {
+            return "Could not reach GitHub (offline or timed out)";
+        }
+        String m = e.getMessage();
+        return (m == null || m.isBlank()) ? e.getClass().getSimpleName() : m;
+    }
+}
