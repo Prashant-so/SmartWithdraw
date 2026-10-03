@@ -181,6 +181,25 @@ logging:
 security:
   secret: ""
 
+# ── UPDATES ──────────────────────────────────────────────────────────
+# Checks your GitHub releases. Admins get a clickable [Download & Install]
+# button; the new jar is verified, your config/data are backed up, and it
+# is applied on the next restart. Your config.yml is never overwritten.
+update:
+  enabled: true
+  github-repo: "YourGitHubName/SmartWithdraw"   # <- OWNER/REPO
+  check-interval-hours: 6
+  notify-console: true
+  notify-admins-on-join: true
+  allow-install: true        # false = only notify, no install button
+  keep-backups: 5
+
+# ── HEALTH CHECK ─────────────────────────────────────────────────────
+# Warns the console and admins (smartwithdraw.admin.health) when a
+# required plugin such as Vault, an economy plugin or PlayerPoints is missing.
+health:
+  notify-admins-on-join: true
+
 # ── MESSAGES ─────────────────────────────────────────────────────────
 messages:
   prefix: "&6&lSmartWithdraw &8» "
