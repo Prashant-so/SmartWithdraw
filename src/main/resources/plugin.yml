@@ -1,12 +1,11 @@
 name: SmartWithdraw
-version: 2.0.0
+version: ${version}
 main: com.smartwithdraw.SmartWithdraw
 api-version: '1.21'
 
-depend:
-  - Vault
-
 softdepend:
+  - Vault
+  - Essentials
   - PlaceholderAPI
   - PlayerPoints
 
@@ -45,4 +44,8 @@ permissions:
   smartwithdraw.admin.give:
     default: op
   smartwithdraw.admin.reload:
+    default: op
+  smartwithdraw.admin.update:
+    default: op
+  smartwithdraw.admin.health:
     default: op
