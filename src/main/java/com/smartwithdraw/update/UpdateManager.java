@@ -36,6 +36,8 @@ public final class UpdateManager {
 
     public static final String PERMISSION = "smartwithdraw.admin.update";
 
+    /** Used when config.yml has no update.github-repo (e.g. configs from older versions). */
+    private static final String DEFAULT_REPO = "Prashant-so/SmartWithdraw";
     private static final Pattern REPO_PATTERN = Pattern.compile("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+");
     private static final long MIN_CHECK_GAP_MS = 30_000L;
 
@@ -351,8 +353,8 @@ public final class UpdateManager {
     }
 
     private static String repo() {
-        String r = cfg().getString("update.github-repo", "");
-        r = r == null ? "" : r.trim();
+        String r = cfg().getString("update.github-repo", DEFAULT_REPO);
+        r = (r == null || r.isBlank()) ? DEFAULT_REPO : r.trim();
         return REPO_PATTERN.matcher(r).matches() ? r : null;
     }
 
