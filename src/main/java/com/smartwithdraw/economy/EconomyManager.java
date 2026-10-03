@@ -13,12 +13,25 @@ public final class EconomyManager {
     private EconomyManager() {
     }
 
+    /**
+     * Safe to call any time, including when Vault is not installed.
+     * Returns true only if a usable economy is registered right now.
+     */
     public static boolean setupEconomy() {
-        RegisteredServiceProvider<Economy> provider =
-                Bukkit.getServicesManager().getRegistration(Economy.class);
-        if (provider == null) return false;
-        economy = provider.getProvider();
-        return economy != null;
+        try {
+            if (Bukkit.getPluginManager().getPlugin("Vault") == null) {
+                economy = null;
+                return false;
+            }
+            RegisteredServiceProvider<Economy> provider =
+                    Bukkit.getServicesManager().getRegistration(Economy.class);
+            economy = provider == null ? null : provider.getProvider();
+            return economy != null;
+        } catch (LinkageError | RuntimeException e) {
+            // Vault classes missing or unloadable
+            economy = null;
+            return false;
+        }
     }
 
     public static Economy getEconomy() {
