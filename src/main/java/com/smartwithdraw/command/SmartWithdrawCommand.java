@@ -7,8 +7,10 @@ import com.smartwithdraw.currency.DenominationCalculator;
 import com.smartwithdraw.currency.NoteFactory;
 import com.smartwithdraw.gui.BankMenu;
 import com.smartwithdraw.gui.InspectMenu;
+import com.smartwithdraw.health.HealthManager;
 import com.smartwithdraw.logging.TransactionLogger;
 import com.smartwithdraw.storage.PendingNoteStorage;
+import com.smartwithdraw.update.UpdateManager;
 import com.smartwithdraw.util.AmountUtil;
 import com.smartwithdraw.util.DailyLimitManager;
 import com.smartwithdraw.util.InventoryUtils;
@@ -43,6 +45,8 @@ public class SmartWithdrawCommand implements CommandExecutor, TabCompleter {
             case "currencies"  -> listCurrencies(sender);
             case "inspect"     -> handleInspect(sender);
             case "limit"       -> handleLimit(sender, args);
+            case "update", "updates" -> handleUpdate(sender, args);
+            case "status", "health"  -> handleStatus(sender);
             default            -> sendHelp(sender);
         }
 
@@ -193,7 +197,30 @@ public class SmartWithdrawCommand implements CommandExecutor, TabCompleter {
         }
         SmartWithdraw.getInstance().reloadConfig();
         CurrencyManager.load();
+        HealthManager.scheduleRefresh();
+        UpdateManager.reload();
         Lang.send(sender, "reload-success");
+    }
+
+    private void handleUpdate(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("smartwithdraw.admin.update")) {
+            Lang.send(sender, "no-permission");
+            return;
+        }
+        String sub = args.length >= 2 ? args[1].toLowerCase() : "check";
+        switch (sub) {
+            case "check"               -> UpdateManager.manualCheck(sender);
+            case "install", "download" -> UpdateManager.install(sender);
+            default -> sender.sendMessage("§cUsage: /sw update <check|install>");
+        }
+    }
+
+    private void handleStatus(CommandSender sender) {
+        if (!sender.hasPermission("smartwithdraw.admin.health")) {
+            Lang.send(sender, "no-permission");
+            return;
+        }
+        HealthManager.sendStatus(sender);
     }
 
     private void sendHelp(CommandSender sender) {
@@ -216,6 +243,14 @@ public class SmartWithdrawCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage("§c/sw reload                     §7➜ Reload config");
         }
 
+        if (sender.hasPermission("smartwithdraw.admin.update")) {
+            sender.sendMessage("§c/sw update [check|install]  §7➜ Check / install updates");
+        }
+
+        if (sender.hasPermission("smartwithdraw.admin.health")) {
+            sender.sendMessage("§c/sw status                  §7➜ Health & dependency report");
+        }
+
         sender.sendMessage("§8§m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     }
 
@@ -227,7 +262,7 @@ public class SmartWithdrawCommand implements CommandExecutor, TabCompleter {
         if (args.length == 1) {
             String partial = args[0].toLowerCase();
             Arrays.asList("gui", "bank", "give", "reload",
-                    "currencies", "inspect", "limit")
+                    "currencies", "inspect", "limit", "update", "status")
                     .stream().filter(s -> s.startsWith(partial))
                     .forEach(completions::add);
             return completions;
@@ -263,6 +298,12 @@ public class SmartWithdrawCommand implements CommandExecutor, TabCompleter {
                     .filter(id -> id.startsWith(partial))
                     .forEach(completions::add);
         }
+        if (sub.equals("update") && args.length == 2) {
+            String partial = args[1].toLowerCase();
+            Arrays.asList("check", "install")
+                    .stream().filter(s -> s.startsWith(partial))
+                    .forEach(completions::add);
+        }
         return completions;
     }
-}
+                      }
