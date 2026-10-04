@@ -3,6 +3,7 @@ package com.smartwithdraw;
 import com.smartwithdraw.command.DepositCommand;
 import com.smartwithdraw.command.SmartWithdrawCommand;
 import com.smartwithdraw.command.WithdrawCommand;
+import com.smartwithdraw.config.ConfigMigrator;
 import com.smartwithdraw.currency.CurrencyManager;
 import com.smartwithdraw.currency.NoteFactory;
 import com.smartwithdraw.economy.EconomyManager;
@@ -40,6 +41,10 @@ public final class SmartWithdraw extends JavaPlugin {
         instance = this;
 
         saveDefaultConfig();
+
+        // Adds options introduced by newer versions to an existing config.yml
+        // (never changes existing values), then reloads it. Must run first.
+        ConfigMigrator.run(this);
 
         // Vault/economy is no longer a hard requirement here. If it is
         // missing the plugin still loads, the affected currencies report
