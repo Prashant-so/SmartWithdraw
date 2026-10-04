@@ -2,6 +2,10 @@
 #   SmartWithdraw Config
 # ============================
 
+# Internal marker - do not edit. Lets SmartWithdraw upgrade this file safely
+# when you install a newer version (new options are added, yours never change).
+config-version: 1
+
 branding:
   server-name: "YourServerName"
 
