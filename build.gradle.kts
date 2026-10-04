@@ -36,6 +36,13 @@ java {
     }
 }
 
+// The jar file is always called SmartWithdraw.jar (no version in the name),
+// so nobody has to rename anything. The real version lives inside the jar
+// (plugin.yml), and that is what the updater and /sw status read.
+tasks.jar {
+    archiveFileName.set("SmartWithdraw.jar")
+}
+
 // Puts the build version into plugin.yml so the jar's internal version
 // always matches the release tag.
 tasks.processResources {
